@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Users,
@@ -9,10 +10,11 @@ import {
   BarChart3,
   UserCog,
   History,
+  LogOut,
 } from "lucide-react";
 
 const navigationItems = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/profiles", label: "Profiles", icon: Users },
   { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { path: "/ledger", label: "Ledger", icon: Calculator },
@@ -28,7 +30,15 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("username");
+    setLocation("/");
+    onClose();
+  };
 
   return (
     <>
@@ -44,7 +54,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed md:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border shadow-lg md:shadow-none transition-transform duration-300",
+          "fixed md:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border shadow-lg md:shadow-none transition-transform duration-300 flex flex-col",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
         data-testid="sidebar"
@@ -55,7 +65,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </h1>
         </div>
         
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 flex flex-col h-full">
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
@@ -81,6 +91,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </Link>
             );
           })}
+          
+          {/* Logout Button */}
+          <div className="mt-auto pt-4 border-t border-border">
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted"
+              data-testid="logout-button"
+            >
+              <LogOut className="w-5 h-5 mr-3" />
+              Logout
+            </Button>
+          </div>
         </nav>
       </aside>
     </>
