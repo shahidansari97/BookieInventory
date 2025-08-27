@@ -1,0 +1,169 @@
+Overview of Technical Feature Breakdown
+Based on the provided Technical Brief for the Bookie Inventory Management System, I've broken down the core and additional features into detailed technical points. For each feature, I've outlined:
+
+Sub-features/Processes: Key functionalities within the feature.
+Forms/Screens: User interfaces (applicable to both web and mobile apps) where interactions occur.
+Fields: Input elements in forms, including data types.
+Validations: Rules to ensure data integrity, including required fields, format checks, and business logic.
+
+This breakdown assumes a full-stack implementation with React.js (web), React Native (mobile), Node.js/Express backend, and MySQL/PostgreSQL database. Features like automated calculations and WhatsApp integration will involve backend cron jobs, API endpoints, and integrations (e.g., WhatsApp Business API). Real-time updates can use WebSockets or polling.
+
+1. Uplink & Downline Management
+This feature handles creating and managing profiles for uplinks (inventory suppliers) and downlines (inventory recipients). Profiles store contact, rate, and commission details for use in transactions and calculations.
+Sub-features/Processes:
+
+Create, edit, view, and delete profiles.
+Search/filter profiles by name, contact, or type (uplink/downline).
+Assign unique IDs to profiles for referencing in transactions.
+
+Forms/Screens:
+
+Profile Creation/Edit Form: A modal or full-screen form for adding/updating uplink or downline details.
+Profile List Screen: A dashboard table view with search, sort, and pagination.
+Profile Detail View: Read-only screen showing full profile info with edit/delete buttons.
+
+Fields (in Profile Creation/Edit Form):
+
+Type: Dropdown (options: Uplink, Downline). Data type: String (enum).
+Name: Text input. Data type: String (max 100 chars).
+Contact Info (Phone): Text input (for WhatsApp integration). Data type: String (phone number format).
+Email: Text input. Data type: String (optional).
+Rate per Point: Numeric input. Data type: Decimal (e.g., 1.5).
+Commission Percentage: Numeric input. Data type: Decimal (e.g., 5.0, for downlines).
+Notes: Textarea. Data type: String (optional, max 500 chars).
+
+Validations:
+
+Type: Required; must be either "Uplink" or "Downline".
+Name: Required; min length 3 chars; no special characters except spaces/hyphens.
+Contact Info (Phone): Required; valid international phone format (e.g., +91xxxxxxxxxx); check for duplicates in database.
+Email: Optional; if provided, valid email format (regex: ^[\w-.]+@([\w-]+.)+[\w-]{2,4}$).
+Rate per Point: Required for uplinks; positive number; min 0.01, max 1000 (business rule to prevent unrealistic rates).
+Commission Percentage: Required for downlines; between 0 and 100; decimal allowed up to 2 places.
+Notes: Optional; no validation beyond length.
+Form-level: Ensure no duplicate profiles by name/phone; backend unique constraint on phone.
+
+
+2. Inventory Transaction Management
+This feature manages recording of inventory taken from uplinks and given to downlines, including points, rates, and commissions.
+Sub-features/Processes:
+
+Add new transactions (Inventory Taken or Given).
+View transaction history with filters (date, uplink/downline, type).
+Edit/delete transactions (with audit logging).
+Real-time update of balances post-transaction.
+
+Forms/Screens:
+
+Transaction Creation Form: Form for logging a new transaction.
+Transaction List Screen: Table view with filters (date range, type, profile), search, and export options.
+Transaction Detail View: Shows full details with edit/delete options.
+
+Fields (in Transaction Creation Form):
+
+Transaction Type: Dropdown (options: Inventory Taken from Uplink, Inventory Given to Downline). Data type: String (enum).
+Profile: Autocomplete dropdown (searchable list of uplinks/downlines based on type). Data type: ID (foreign key).
+Date: Date picker. Data type: Date (default: current date).
+Points: Numeric input. Data type: Integer (e.g., 1000).
+Rate per Point: Numeric input (pre-filled from profile if available). Data type: Decimal.
+Commission Percentage: Numeric input (pre-filled for downlines). Data type: Decimal (applicable only for "Given" type).
+Notes: Textarea. Data type: String (optional).
+
+Validations:
+
+Transaction Type: Required; restricts profile dropdown (e.g., only uplinks for "Taken").
+Profile: Required; must match type (uplink for Taken, downline for Given); validate existence in database.
+Date: Required; must be past or current date (no future dates); format YYYY-MM-DD.
+Points: Required; positive integer; min 1, max 1,000,000 (to prevent overflow in calculations).
+Rate per Point: Required; positive decimal; min 0.01; if pre-filled, allow override but warn if different from profile.
+Commission Percentage: Required for "Given" type; between 0 and 100; pre-filled validation as above.
+Notes: Optional; max 500 chars.
+Form-level: Calculate total value (points * rate * (1 + commission/100)) on submit; ensure it doesn't exceed bookie's available inventory (business rule check via backend query).
+
+
+3. Automated Ledger Calculation
+This feature automates weekly balance calculations, applying rates and commissions, and generates profit/loss reports.
+Sub-features/Processes:
+
+Backend cron job for weekly calculations (e.g., every Monday).
+On-demand calculation via UI button.
+Compute balances: Uplink (owed = sum(taken points * rate)), Downline (receivable = sum(given points * rate * (1 + commission/100))).
+Bookie profit = total receivable - total owed.
+Store calculated ledgers in database for history.
+
+Forms/Screens:
+
+Ledger Calculation Screen: Button to trigger manual calculation; displays results in a table.
+Profit/Loss Report Screen: View with charts/tables for bookie overview.
+
+Fields (Minimal, as this is mostly automated; fields in Report Filters):
+
+Date Range Start: Date picker. Data type: Date.
+Date Range End: Date picker. Data type: Date.
+Profile Filter: Multi-select dropdown (uplinks/downlines). Data type: Array of IDs.
+
+Validations:
+
+Date Range Start: Required for custom reports; must be before End; valid date format.
+Date Range End: Required; must be after Start; not future date.
+Profile Filter: Optional; if selected, validate IDs exist.
+Form-level: For automated runs, use fixed weekly range (e.g., previous Monday to Sunday); ensure no overlapping calculations (lock mechanism in backend).
+
+
+4. Automatic Settlement & WhatsApp Integration
+This feature generates and sends ledger balances weekly via WhatsApp, with manual trigger option.
+Sub-features/Processes:
+
+Auto-generate settlements on Mondays (cron job).
+Format message: "Ledger Balance: [Amount] for [Period]".
+Integrate with WhatsApp Business API for sending.
+Log send status (success/failure) in audit trail.
+
+Forms/Screens:
+
+Settlement Trigger Screen: Button for manual settlement; preview of messages before send.
+Settlement History Screen: List of past settlements with status and resend option.
+
+Fields (in Manual Trigger Form):
+
+Settlement Date: Date picker (default: current). Data type: Date.
+Profiles to Settle: Multi-select (all uplinks/downlines). Data type: Array of IDs.
+Message Template: Textarea (editable preview). Data type: String.
+
+Validations:
+
+Settlement Date: Required; must not have existing settlement (check database).
+Profiles to Settle: Required; at least one; validate phone numbers exist and are valid for WhatsApp.
+Message Template: Required; min length 10 chars; include placeholders like {balance}, {period}.
+Form-level: Backend validation for API key (WhatsApp integration); handle rate limits; confirm send only if balances are calculated.
+
+
+5. Additional Features
+5.1 Real-time Dashboard
+
+Sub-features/Processes: Display key metrics; refresh in real-time via WebSockets.
+Forms/Screens: Dashboard Screen – Cards/charts for totals.
+Fields: None (read-only); metrics like Total Purchased (sum), Distributed (sum), Outstanding (calculated).
+Validations: N/A (data fetched from backend queries).
+
+5.2 Custom Date Range Reports
+
+Sub-features/Processes: Generate/export reports (PDF/CSV).
+Forms/Screens: Report Generation Form.
+Fields: Date Start/End (as in Ledger); Report Type (dropdown: Balance, Profit/Loss).
+Validations: Date range as above; ensure data exists for range.
+
+5.3 Role-based Access Control (RBAC)
+
+Sub-features/Processes: User roles (Bookie: full access; Assistant: view/edit limited).
+Forms/Screens: Login Form; User Management Screen (for bookie).
+Fields (User Creation): Username (string), Password (string), Role (dropdown: Bookie/Assistant).
+Validations: Username unique; password min 8 chars, hashed; role required.
+
+5.4 Audit Trail
+
+Sub-features/Processes: Log all actions (create/edit/delete) with timestamps/user.
+Forms/Screens: Audit Log Screen – Table view with filters.
+Fields (Filters): Date Range, Action Type (dropdown), User.
+Validations: Date filters as above; read-only access based on role.
+4.7s

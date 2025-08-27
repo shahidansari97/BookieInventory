@@ -1,0 +1,55 @@
+Technical Brief – Bookie Inventory Management System
+1. Overview
+This system will be a web and mobile application designed to automate the management of inventory
+(e.g., Cricket IDs, Super Masters) for bookies.
+Currently, bookies take inventory from uplinks (exchanges) and distribute it to their downlines after
+taking a commission percentage. The process is done manually in Excel and settled weekly via
+WhatsApp messages.
+The goal is to digitize this process, automate settlement calculations, and automatically send ledger
+balances via WhatsApp.
+Target Platforms:
+● Web App – React.js preferred.
+● Mobile App – React Native preferred.
+● Backend – Node.js / Express with MySQL/PostgreSQL.
+2. Current Workflow (Manual)
+1. Bookie takes inventory points from uplinks with a rate.
+2. Bookie distributes inventory to downlines with their own commission rate.
+3. Transactions are recorded manually in Excel.
+4. Every Monday, bookie tallies all uplink and downline balances.
+5. Ledger balances are shared manually via WhatsApp.
+3. Objectives
+● Replace Excel-based tracking with a centralized digital ledger system.
+● Automate balance calculations for uplinks and downlines.
+● Provide real-time visibility of inventory points, rates, and balances.
+● Automatically send weekly settlement reports via WhatsApp.
+4. Core Features & Process Flow
+4.1 Uplink & Downline Management
+● Create profiles for uplinks (from whom inventory is purchased).
+● Create profiles for downlines (to whom inventory is sold).
+● Store details like contact info, rate, and commission percentage.
+4.2 Inventory Transaction Management
+● Add transactions for:
+● Inventory Taken (from uplink).
+● Inventory Given (to downline).
+● Record:
+● Date
+● Points (inventory amount)
+● Rate per point
+● Commission percentage (if applicable)
+4.3 Automated Ledger Calculation
+● Calculate weekly balances automatically for each uplink and downline.
+● Apply commission rates and point rates in calculations.
+● Generate profit/loss reports for the bookie.
+4.4 Automatic Settlement & WhatsApp Integration
+● On settlement day (e.g., every Monday):
+● Auto-generate ledger balances for each uplink and downline.
+● Send balances directly to contacts via WhatsApp Business API.
+● Option to trigger settlements manually.
+5. Additional Features
+● Real-time dashboard showing:
+● Total inventory purchased.
+● Total inventory distributed.
+● Current outstanding balances.
+● Custom date range reports (not just weekly).
+● Role-based access control for bookies and assistants.
+● Audit trail for all transactions.
