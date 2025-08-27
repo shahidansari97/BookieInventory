@@ -1,0 +1,88 @@
+import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  Users,
+  ArrowLeftRight,
+  Calculator,
+  Send,
+  BarChart3,
+  UserCog,
+  History,
+} from "lucide-react";
+
+const navigationItems = [
+  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/profiles", label: "Profiles", icon: Users },
+  { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { path: "/ledger", label: "Ledger", icon: Calculator },
+  { path: "/settlement", label: "Settlement", icon: Send },
+  { path: "/reports", label: "Reports", icon: BarChart3 },
+  { path: "/users", label: "Users", icon: UserCog },
+  { path: "/audit", label: "Audit Trail", icon: History },
+];
+
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const [location] = useLocation();
+
+  return (
+    <>
+      {/* Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={onClose}
+          data-testid="sidebar-overlay"
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed md:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border shadow-lg md:shadow-none transition-transform duration-300",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+        data-testid="sidebar"
+      >
+        <div className="p-4 border-b border-border hidden md:block">
+          <h1 className="text-xl font-bold text-primary" data-testid="sidebar-title">
+            Bookie System
+          </h1>
+        </div>
+        
+        <nav className="p-4 space-y-2">
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.path;
+            
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                onClick={onClose}
+                data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <a
+                  className={cn(
+                    "flex items-center space-x-3 p-3 rounded-lg transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </a>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
+  );
+}
