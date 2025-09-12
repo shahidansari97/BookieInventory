@@ -12,61 +12,94 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/tables/data-table";
-import { mockProfiles } from "@/lib/mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Reports() {
   const [reportType, setReportType] = useState("profit-loss");
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-01-15");
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [shouldGenerate, setShouldGenerate] = useState(true);
+  const { toast } = useToast();
+
+  // Fetch report data
+  const { data: reportResult, isLoading, refetch } = useQuery({
+    queryKey: ["/api/reports", { startDate, endDate, reportType }],
+    queryFn: () => {
+      const params = new URLSearchParams({ 
+        startDate, 
+        endDate, 
+        reportType 
+      });
+      return fetch(`/api/reports?${params}`).then(res => res.json());
+    },
+    enabled: shouldGenerate,
+  });
 
   const handleGenerateReport = () => {
-    console.log("Generate report:", { reportType, startDate, endDate });
-    // In a real app, this would call an API
+    setShouldGenerate(true);
+    refetch();
+    toast({
+      title: "Generating Report",
+      description: "Report is being generated with current filters",
+    });
   };
 
   const handleExportPDF = () => {
-    console.log("Export PDF");
-    // In a real app, this would trigger PDF download
+    toast({
+      title: "Feature Coming Soon",
+      description: "PDF export functionality will be implemented",
+    });
   };
 
   const handleExportCSV = () => {
-    console.log("Export CSV");
-    // In a real app, this would trigger CSV download
+    if (!reportResult?.data) {
+      toast({
+        title: "No Data",
+        description: "Please generate a report first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simple CSV export
+    const headers = ["Profile", "Type", "Volume", "Revenue", "Commission", "Net P&L"];
+    const csvContent = [
+      headers.join(","),
+      ...reportResult.data.map((row: any) => [
+        row.profileName,
+        row.type,
+        row.volume,
+        row.revenue,
+        row.commission,
+        row.netPL
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${reportType}-${startDate}-${endDate}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "CSV Downloaded",
+      description: "Report has been exported to CSV",
+    });
   };
 
-  // Sample report data
-  const reportData = [
-    {
-      id: "1",
-      profileName: "Agent Kumar",
-      type: "Downline",
-      volume: "75,000 pts",
-      revenue: "₹1,23,750",
-      commission: "₹6,188",
-      netPL: "+₹11,250",
-      isProfit: true,
-    },
-    {
-      id: "2",
-      profileName: "Agent Sharma",
-      type: "Downline",
-      volume: "45,000 pts",
-      revenue: "₹76,500",
-      commission: "₹6,120",
-      netPL: "+₹9,000",
-      isProfit: true,
-    },
-    {
-      id: "3",
-      profileName: "Super Exchange",
-      type: "Uplink",
-      volume: "250,000 pts",
-      revenue: "-",
-      commission: "-",
-      netPL: "-₹3,75,000",
-      isProfit: false,
-    },
-  ];
+  const reportData = reportResult?.data || [];
+  const summary = reportResult?.summary || {
+    totalRevenue: 0,
+    totalCosts: 0,
+    grossProfit: 0,
+    profitMargin: 0
+  };
 
   const columns = [
     {
@@ -187,7 +220,10 @@ export default function Reports() {
             <div>
               <CardTitle>Profit/Loss Report</CardTitle>
               <p className="text-sm text-muted-foreground" data-testid="report-period">
-                January 1-15, 2024
+                {reportResult?.period ? 
+                  `${new Date(reportResult.period.start).toLocaleDateString("en-IN")} - ${new Date(reportResult.period.end).toLocaleDateString("en-IN")}` :
+                  "Select date range and generate report"
+                }
               </p>
             </div>
             <div className="space-x-2">
@@ -215,41 +251,53 @@ export default function Reports() {
         <CardContent>
           {/* Report Summary */}
           <div className="p-6 border-b border-border">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary" data-testid="total-revenue">
-                  ₹3,75,000
+            {isLoading ? (
+              <div className="text-center text-muted-foreground">Loading report data...</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary" data-testid="total-revenue">
+                    ₹{summary.totalRevenue.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Revenue</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Total Revenue</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-destructive" data-testid="total-costs">
-                  ₹2,25,000
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-destructive" data-testid="total-costs">
+                    ₹{summary.totalCosts.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Costs</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Total Costs</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600" data-testid="gross-profit">
-                  ₹1,50,000
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600" data-testid="gross-profit">
+                    ₹{summary.grossProfit.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Gross Profit</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Gross Profit</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600" data-testid="profit-margin">
-                  40%
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600" data-testid="profit-margin">
+                    {summary.profitMargin.toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-muted-foreground">Profit Margin</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Profit Margin</div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Detailed Breakdown */}
           <div className="p-0">
-            <DataTable
-              data={reportData}
-              columns={columns}
-              testId="report-breakdown-table"
-            />
+            {isLoading ? (
+              <div className="p-4 text-center text-muted-foreground">Loading report breakdown...</div>
+            ) : reportData.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                No transactions found for the selected period
+              </div>
+            ) : (
+              <DataTable
+                data={reportData}
+                columns={columns}
+                testId="report-breakdown-table"
+              />
+            )}
           </div>
         </CardContent>
       </Card>

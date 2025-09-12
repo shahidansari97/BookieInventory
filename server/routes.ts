@@ -435,6 +435,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reports routes
+  app.get("/api/reports", async (req, res) => {
+    try {
+      const { startDate, endDate, reportType = "profit-loss" } = req.query;
+      
+      // Default date range if not provided
+      const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      
+      // Get transactions in date range
+      const transactions = await storage.getTransactionsByDateRange(start, end);
+      const profiles = await storage.getAllProfiles();
+      
+      // Calculate report data
+      const reportData = [];
+      const profileStats = new Map();
+      
+      // Initialize stats for all profiles
+      profiles.forEach(profile => {
+        profileStats.set(profile.id, {
+          profileName: profile.name,
+          type: profile.type === "uplink" ? "Uplink" : "Downline",
+          volume: 0,
+          revenue: 0,
+          commission: 0,
+          netPL: 0,
+          isProfit: false
+        });
+      });
+      
+      // Process transactions
+      transactions.forEach(transaction => {
+        const stats = profileStats.get(transaction.profileId);
+        if (!stats) return;
+        
+        const amount = parseFloat(transaction.totalAmount);
+        const commission = transaction.commissionPercentage ? 
+          (amount * parseFloat(transaction.commissionPercentage)) / 100 : 0;
+        
+        stats.volume += transaction.points;
+        
+        if (transaction.type === "taken") {
+          // We took from uplink - this is our cost
+          stats.revenue = 0; // Uplinks don't generate revenue for us
+          stats.commission = 0;
+          stats.netPL -= amount; // We owe money to uplink
+        } else {
+          // We gave to downline - this is our revenue
+          stats.revenue += amount;
+          stats.commission += commission;
+          stats.netPL += commission; // Our profit from commission
+        }
+        
+        stats.isProfit = stats.netPL > 0;
+      });
+      
+      // Convert to array and format
+      profileStats.forEach((stats, profileId) => {
+        if (stats.volume > 0) { // Only include profiles with activity
+          reportData.push({
+            id: profileId,
+            profileName: stats.profileName,
+            type: stats.type,
+            volume: `${stats.volume.toLocaleString("en-IN")} pts`,
+            revenue: stats.revenue > 0 ? `₹${stats.revenue.toLocaleString("en-IN")}` : "-",
+            commission: stats.commission > 0 ? `₹${stats.commission.toLocaleString("en-IN")}` : "-",
+            netPL: `${stats.netPL >= 0 ? '+' : ''}₹${stats.netPL.toLocaleString("en-IN")}`,
+            isProfit: stats.isProfit
+          });
+        }
+      });
+      
+      // Calculate summary totals
+      const totals = Array.from(profileStats.values()).reduce((acc, stats) => {
+        acc.totalRevenue += Math.max(0, stats.revenue);
+        acc.totalCosts += Math.abs(Math.min(0, stats.netPL));
+        acc.grossProfit += stats.netPL;
+        return acc;
+      }, { totalRevenue: 0, totalCosts: 0, grossProfit: 0 });
+      
+      const profitMargin = totals.totalRevenue > 0 ? 
+        (totals.grossProfit / totals.totalRevenue * 100) : 0;
+      
+      res.json({
+        reportType,
+        period: {
+          start: start.toISOString().split('T')[0],
+          end: end.toISOString().split('T')[0]
+        },
+        summary: {
+          totalRevenue: totals.totalRevenue,
+          totalCosts: totals.totalCosts,
+          grossProfit: totals.grossProfit,
+          profitMargin: profitMargin
+        },
+        data: reportData
+      });
+    } catch (error) {
+      console.error("Reports generation error:", error);
+      res.status(500).json({ error: "Failed to generate reports" });
+    }
+  });
+
   // Audit log routes
   app.get("/api/audit", async (req, res) => {
     try {
