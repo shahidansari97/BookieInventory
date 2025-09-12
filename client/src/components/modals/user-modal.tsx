@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { insertUserSchema, type InsertUser, type User } from "@shared/schema";
+import { z } from "zod";
 
 interface UserModalProps {
   isOpen: boolean;
@@ -42,8 +43,15 @@ export default function UserModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!user;
 
+  // Create dynamic schema based on editing mode
+  const formSchema = isEditing 
+    ? insertUserSchema.extend({
+        password: z.string().optional().or(z.literal("")),
+      })
+    : insertUserSchema;
+
   const form = useForm<InsertUser>({
-    resolver: zodResolver(insertUserSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
       email: "",
@@ -73,7 +81,13 @@ export default function UserModal({
   const handleSubmit = async (data: InsertUser) => {
     setIsSubmitting(true);
     try {
-      onSubmit(data);
+      // If editing and password is empty, remove it from the data
+      if (isEditing && (!data.password || data.password === "")) {
+        const { password, ...dataWithoutPassword } = data;
+        onSubmit(dataWithoutPassword as InsertUser);
+      } else {
+        onSubmit(data);
+      }
       onClose();
     } catch (error) {
       console.error("Error submitting user:", error);

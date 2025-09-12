@@ -212,6 +212,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const userData = insertUserSchema.partial().parse(req.body);
+      const user = await storage.updateUser(req.params.id, userData);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: "system", // In a real app, get from session
+        action: "UPDATE", 
+        resource: "User",
+        resourceId: user.id,
+        details: `Updated user: ${user.username}`,
+        ipAddress: req.ip,
+      });
+
+      res.json(user);
+    } catch (error) {
+      console.error("User update error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: "Failed to update user" });
+      }
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteUser(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: "system", // In a real app, get from session
+        action: "DELETE",
+        resource: "User",
+        resourceId: req.params.id,
+        details: `Deleted user: ${req.params.id}`,
+        ipAddress: req.ip,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Ledger routes
   app.get("/api/ledger", async (req, res) => {
     try {

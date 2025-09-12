@@ -10,19 +10,59 @@ import DataTable from "@/components/tables/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { mockTransactions, mockProfiles } from "@/lib/mock-data";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { type Transaction, type Profile } from "@shared/schema";
+import { useMemo } from "react";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
 
-  const recentTransactions = mockTransactions.slice(0, 3);
+  // Fetch real data from APIs
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+  });
+
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
+
+  // Calculate real stats from actual data
+  const stats = useMemo(() => {
+    // Always calculate profile counts even if no transactions
+    const uplinksCount = profiles.filter(p => p.type === "uplink").length;
+    const downlinesCount = profiles.filter(p => p.type === "downline").length;
+    
+    // Transaction stats only calculated if transactions exist
+    const totalTransactions = transactions.length;
+    const totalAmount = transactions.reduce((sum, t) => sum + parseFloat(t.totalAmount), 0);
+    
+    // Get recent transactions (last 3) 
+    const sortedTransactions = [...transactions].sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateB.getTime() - dateA.getTime();
+    });
+    const recentTransactions = sortedTransactions.slice(0, 3);
+
+
+    return {
+      totalTransactions,
+      totalAmount,
+      uplinksCount,
+      downlinesCount,
+      recentTransactions
+    };
+  }, [transactions, profiles]);
 
   const columns = [
     {
       key: "date",
       title: "Date",
-      render: (value: Date) => value.toLocaleDateString("en-IN"),
+      render: (value: Date | string) => {
+        const date = value instanceof Date ? value : new Date(value);
+        return date.toLocaleDateString("en-IN");
+      },
     },
     {
       key: "type",
@@ -54,7 +94,7 @@ export default function Dashboard() {
       key: "profileId",
       title: "Profile",
       render: (value: string) => {
-        const profile = mockProfiles.find(p => p.id === value);
+        const profile = profiles.find(p => p.id === value);
         return profile?.name || "Unknown";
       },
     },
@@ -86,36 +126,36 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
-          title="Total Inventory Purchased"
-          value="₹12,45,000"
-          icon={TrendingDown}
+          title="Total Transactions"
+          value={transactionsLoading ? "..." : stats.totalTransactions.toString()}
+          icon={Clock}
           iconColor="text-primary"
           iconBgColor="bg-primary/10"
           valueColor="text-primary"
         />
         <StatCard
-          title="Total Inventory Distributed"
-          value="₹10,85,000"
-          icon={TrendingUp}
-          iconColor="text-green-600"
-          iconBgColor="bg-green-100"
-          valueColor="text-green-600"
-        />
-        <StatCard
-          title="Outstanding Balance"
-          value="₹1,60,000"
-          icon={Clock}
-          iconColor="text-yellow-600"
-          iconBgColor="bg-yellow-100"
-          valueColor="text-yellow-600"
-        />
-        <StatCard
-          title="Net Profit"
-          value="₹85,500"
+          title="Total Amount"
+          value={transactionsLoading ? "..." : `₹${stats.totalAmount.toLocaleString("en-IN")}`}
           icon={TrendingUpIcon}
           iconColor="text-green-600"
           iconBgColor="bg-green-100"
           valueColor="text-green-600"
+        />
+        <StatCard
+          title="Active Uplinks"
+          value={profilesLoading ? "..." : stats.uplinksCount.toString()}
+          icon={TrendingUp}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
+          valueColor="text-blue-600"
+        />
+        <StatCard
+          title="Active Downlines"
+          value={profilesLoading ? "..." : stats.downlinesCount.toString()}
+          icon={TrendingDown}
+          iconColor="text-purple-600"
+          iconBgColor="bg-purple-100"
+          valueColor="text-purple-600"
         />
       </div>
 
@@ -138,7 +178,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
-            data={recentTransactions}
+            data={stats.recentTransactions}
             columns={columns}
             itemsPerPage={10}
             testId="recent-transactions-table"

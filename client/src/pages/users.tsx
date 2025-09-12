@@ -4,12 +4,80 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import UserModal from "@/components/modals/user-modal";
-import { mockUsers } from "@/lib/mock-data";
 import { type User, type InsertUser } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const { toast } = useToast();
+
+  // Fetch users from API
+  const { data: users = [], isLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: (data: InsertUser) => apiRequest("POST", "/api/users", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      });
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<InsertUser> }) => 
+      apiRequest("PUT", `/api/users/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/users/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAddUser = () => {
     setSelectedUser(null);
@@ -22,13 +90,21 @@ export default function Users() {
   };
 
   const handleSubmitUser = (data: InsertUser) => {
-    console.log("User submitted:", data);
-    // In a real app, this would call an API
+    if (selectedUser) {
+      updateUserMutation.mutate({ id: selectedUser.id, data });
+    } else {
+      createUserMutation.mutate(data);
+    }
   };
 
   const handleToggleUserStatus = (userId: string) => {
-    console.log("Toggle user status:", userId);
-    // In a real app, this would call an API
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      updateUserMutation.mutate({
+        id: userId,
+        data: { isActive: !user.isActive }
+      });
+    }
   };
 
   const formatLastLogin = (date: Date | null) => {
@@ -150,7 +226,7 @@ export default function Users() {
 
       {/* Users Table */}
       <DataTable
-        data={mockUsers}
+        data={users}
         columns={columns}
         testId="users-table"
       />
