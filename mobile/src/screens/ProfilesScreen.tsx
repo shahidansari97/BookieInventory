@@ -6,39 +6,42 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import type { ProfilesScreenProps } from '../types/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../utils/api';
 
 export default function ProfilesScreen({ navigation }: ProfilesScreenProps) {
-  const uplinks = [
-    { id: 1, name: 'Premium Uplink', contact: '+91 9876543210', rate: '₹95/point', status: 'Active' },
-    { id: 2, name: 'Elite Sports', contact: '+91 8765432109', rate: '₹92/point', status: 'Active' },
-    { id: 3, name: 'Super Betting', contact: '+91 7654321098', rate: '₹90/point', status: 'Inactive' },
-  ];
+  const { data: profilesResponse, isLoading, refetch, error } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => apiClient.getProfiles(),
+  });
 
-  const downlinks = [
-    { id: 1, name: 'Mumbai Kings', contact: '+91 9988776655', rate: '₹100/point', commission: '5%', status: 'Active' },
-    { id: 2, name: 'Chennai Express', contact: '+91 8877665544', rate: '₹98/point', commission: '3%', status: 'Active' },
-    { id: 3, name: 'Delhi Daredevils', contact: '+91 7766554433', rate: '₹96/point', commission: '4%', status: 'Active' },
-    { id: 4, name: 'Kolkata Knights', contact: '+91 6655443322', rate: '₹95/point', commission: '2%', status: 'Inactive' },
-  ];
+  // Handle API response consistently
+  const profiles = profilesResponse?.success ? profilesResponse.data : [];
+  const hasError = !profilesResponse?.success || !!error;
+
+  // Filter profiles by type
+  const uplinks = profiles.filter((profile: any) => profile.type === 'uplink') || [];
+  const downlinks = profiles.filter((profile: any) => profile.type === 'downlink') || [];
 
   const ProfileCard = ({ profile, type }: { profile: any; type: 'uplink' | 'downlink' }) => (
     <TouchableOpacity style={styles.profileCard} testID={`${type}-${profile.id}`}>
       <View style={styles.profileHeader}>
         <View>
           <Text style={styles.profileName}>{profile.name}</Text>
-          <Text style={styles.profileContact}>{profile.contact}</Text>
+          <Text style={styles.profileContact}>{profile.phone || profile.contact || 'No contact'}</Text>
         </View>
         <View style={[
           styles.statusBadge,
-          { backgroundColor: profile.status === 'Active' ? '#dcfce7' : '#fef2f2' }
+          { backgroundColor: profile.status === 'active' ? '#dcfce7' : '#fef2f2' }
         ]}>
           <Text style={[
             styles.statusText,
-            { color: profile.status === 'Active' ? '#16a34a' : '#dc2626' }
+            { color: profile.status === 'active' ? '#16a34a' : '#dc2626' }
           ]}>
-            {profile.status}
+            {profile.status === 'active' ? 'Active' : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -46,12 +49,18 @@ export default function ProfilesScreen({ navigation }: ProfilesScreenProps) {
       <View style={styles.profileDetails}>
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Rate</Text>
-          <Text style={styles.detailValue}>{profile.rate}</Text>
+          <Text style={styles.detailValue}>₹{profile.ratePerPoint}/point</Text>
         </View>
-        {profile.commission && (
+        {profile.commissionPercentage && (
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Commission</Text>
-            <Text style={styles.detailValue}>{profile.commission}</Text>
+            <Text style={styles.detailValue}>{profile.commissionPercentage}%</Text>
+          </View>
+        )}
+        {profile.email && (
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Email</Text>
+            <Text style={styles.detailValue}>{profile.email}</Text>
           </View>
         )}
       </View>
@@ -61,12 +70,44 @@ export default function ProfilesScreen({ navigation }: ProfilesScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Uplinks Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Uplinks</Text>
-            <Text style={styles.sectionCount}>({uplinks.length})</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profiles Management</Text>
+          <TouchableOpacity 
+            onPress={() => refetch()} 
+            style={styles.refreshButton}
+            testID="refresh-profiles"
+          >
+            <Text style={styles.refreshText}>🔄</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Error State */}
+        {hasError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>
+              {profilesResponse?.error || 'Failed to load profiles'}
+            </Text>
+            <TouchableOpacity onPress={() => refetch()} style={styles.retryButton}>
+              <Text style={styles.retryText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3b82f6" />
+            <Text style={styles.loadingText}>Loading profiles...</Text>
+          </View>
+        ) : !hasError ? (
+          <>
+            {/* Uplinks Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Uplinks</Text>
+                <Text style={styles.sectionCount}>({uplinks.length})</Text>
+              </View>
           <Text style={styles.sectionDescription}>
             Your inventory suppliers with negotiated rates
           </Text>
@@ -102,6 +143,19 @@ export default function ProfilesScreen({ navigation }: ProfilesScreenProps) {
             <Text style={styles.addButtonText}>+ Add Downline</Text>
           </TouchableOpacity>
         </View>
+            </>
+          )}
+
+        {/* Empty State */}
+        {!isLoading && profiles?.data?.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>🏢</Text>
+            <Text style={styles.emptyTitle}>No Profiles Found</Text>
+            <Text style={styles.emptySubtitle}>
+              No profiles configured. Add uplinks and downlines to start trading.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -111,6 +165,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  errorContainer: {
+    backgroundColor: '#fef2f2',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  errorIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,
@@ -194,6 +277,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#1e293b',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    marginBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  refreshText: {
+    fontSize: 20,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   addButton: {
     backgroundColor: '#3b82f6',

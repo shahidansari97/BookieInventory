@@ -16,10 +16,14 @@ export default function ReportsScreen({ navigation }: ReportsScreenProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('2025-09');
   const [selectedType, setSelectedType] = useState('summary');
 
-  const { data: reports, isLoading, refetch } = useQuery({
+  const { data: reportsResponse, isLoading, refetch, error } = useQuery({
     queryKey: ['reports', selectedPeriod, selectedType],
     queryFn: () => apiClient.getReports(selectedPeriod, selectedType),
   });
+
+  // Handle API response consistently
+  const reports = reportsResponse?.success ? reportsResponse.data : null;
+  const hasError = !reportsResponse?.success || !!error;
 
   const periods = ['2025-09', '2025-08', '2025-07'];
   const reportTypes = [

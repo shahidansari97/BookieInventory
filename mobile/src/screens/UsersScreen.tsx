@@ -16,10 +16,14 @@ import { apiClient } from '../utils/api';
 export default function UsersScreen({ navigation }: UsersScreenProps) {
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading, refetch } = useQuery({
+  const { data: usersResponse, isLoading, refetch, error } = useQuery({
     queryKey: ['users'],
     queryFn: () => apiClient.getUsers(),
   });
+
+  // Handle API response consistently
+  const users = usersResponse?.success ? usersResponse.data : [];
+  const hasError = !usersResponse?.success || !!error;
 
   const deleteUserMutation = useMutation({
     mutationFn: (userId: string) => apiClient.deleteUser(userId),
@@ -126,9 +130,9 @@ export default function UsersScreen({ navigation }: UsersScreenProps) {
   );
 
   const userStats = {
-    total: users?.data?.length || 0,
-    bookies: users?.data?.filter((u: any) => u.role === 'bookie').length || 0,
-    assistants: users?.data?.filter((u: any) => u.role === 'assistant').length || 0,
+    total: hasError ? 0 : users.length,
+    bookies: hasError ? 0 : users.filter((u: any) => u.role === 'bookie').length,
+    assistants: hasError ? 0 : users.filter((u: any) => u.role === 'assistant').length,
   };
 
   return (

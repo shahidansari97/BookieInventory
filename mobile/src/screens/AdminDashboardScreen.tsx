@@ -17,20 +17,29 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   const { logout, user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('2025-09');
 
-  const { data: profiles, isLoading: profilesLoading } = useQuery({
+  const { data: profilesResponse, isLoading: profilesLoading, error: profilesError } = useQuery({
     queryKey: ['profiles'],
     queryFn: () => apiClient.getProfiles(),
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery({
+  const { data: transactionsResponse, isLoading: transactionsLoading, error: transactionsError } = useQuery({
     queryKey: ['transactions'],
     queryFn: () => apiClient.getTransactions(1, 5),
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: usersResponse, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['users'],
     queryFn: () => apiClient.getUsers(),
   });
+
+  // Handle API responses consistently
+  const profiles = profilesResponse?.success ? profilesResponse.data : [];
+  const transactions = transactionsResponse?.success ? transactionsResponse.data.data : [];
+  const users = usersResponse?.success ? usersResponse.data : [];
+  
+  const hasProfilesError = !profilesResponse?.success || !!profilesError;
+  const hasTransactionsError = !transactionsResponse?.success || !!transactionsError;
+  const hasUsersError = !usersResponse?.success || !!usersError;
 
   const handleLogout = async () => {
     await logout();
@@ -60,24 +69,27 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   const systemStats = [
     { 
       title: 'Total Users', 
-      value: users?.data?.length || 0, 
+      value: hasUsersError ? 'Error' : users.length, 
       icon: '👥', 
       color: '#3b82f6',
-      loading: usersLoading
+      loading: usersLoading,
+      hasError: hasUsersError
     },
     { 
       title: 'Active Profiles', 
-      value: profiles?.data?.filter(p => p.status === 'active')?.length || 0, 
+      value: hasProfilesError ? 'Error' : profiles.filter(p => p.status === 'active').length, 
       icon: '🏢', 
       color: '#10b981',
-      loading: profilesLoading
+      loading: profilesLoading,
+      hasError: hasProfilesError
     },
     { 
       title: 'Recent Transactions', 
-      value: transactions?.data?.data?.length || 0, 
+      value: hasTransactionsError ? 'Error' : transactions.length, 
       icon: '💱', 
       color: '#f59e0b',
-      loading: transactionsLoading
+      loading: transactionsLoading,
+      hasError: hasTransactionsError
     },
     { 
       title: 'System Status', 
@@ -114,6 +126,10 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 </View>
                 {stat.loading ? (
                   <ActivityIndicator size="small" color={stat.color} />
+                ) : stat.hasError ? (
+                  <Text style={[styles.statValue, { color: '#dc2626' }]}>
+                    Error
+                  </Text>
                 ) : (
                   <Text style={[styles.statValue, { color: stat.color }]}>
                     {stat.value}

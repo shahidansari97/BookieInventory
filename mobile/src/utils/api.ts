@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api';
 
 interface ApiResponse<T> {
   data: T;
@@ -42,8 +42,9 @@ class ApiClient {
       
       return { data, success: true };
     } catch (error) {
+      console.error('API request failed:', endpoint, error);
       return { 
-        data: {} as T, 
+        data: null as T, 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
@@ -86,11 +87,19 @@ class ApiClient {
 
   // Add specific API methods for mobile app
   async getProfiles(): Promise<ApiResponse<any[]>> {
-    return this.get<any[]>('/profiles');
+    const response = await this.get<any[]>('/profiles');
+    if (!response.success) {
+      return { data: [], success: false, error: response.error };
+    }
+    return response;
   }
 
   async getTransactions(page: number = 1, limit: number = 10): Promise<ApiResponse<{ data: any[]; pagination: any }>> {
-    return this.get<{ data: any[]; pagination: any }>(`/transactions?page=${page}&limit=${limit}`);
+    const response = await this.get<{ data: any[]; pagination: any }>(`/transactions?page=${page}&limit=${limit}`);
+    if (!response.success) {
+      return { data: { data: [], pagination: { page: 1, limit, total: 0, hasNext: false, hasPrevious: false } }, success: false, error: response.error };
+    }
+    return response;
   }
 
   async createTransaction(transactionData: any): Promise<ApiResponse<any>> {
@@ -99,7 +108,11 @@ class ApiClient {
 
   async getLedgerEntries(period?: string): Promise<ApiResponse<any[]>> {
     const endpoint = period ? `/ledger?period=${period}` : '/ledger';
-    return this.get<any[]>(endpoint);
+    const response = await this.get<any[]>(endpoint);
+    if (!response.success) {
+      return { data: [], success: false, error: response.error };
+    }
+    return response;
   }
 
   async calculateLedger(period: string): Promise<ApiResponse<any>> {
@@ -111,15 +124,27 @@ class ApiClient {
     if (period) params.append('period', period);
     if (type) params.append('type', type);
     const endpoint = `/reports${params.toString() ? `?${params.toString()}` : ''}`;
-    return this.get<any>(endpoint);
+    const response = await this.get<any>(endpoint);
+    if (!response.success) {
+      return { data: null, success: false, error: response.error };
+    }
+    return response;
   }
 
   async getAuditLogs(page: number = 1, limit: number = 10): Promise<ApiResponse<{ data: any[]; pagination: any }>> {
-    return this.get<{ data: any[]; pagination: any }>(`/audit?page=${page}&limit=${limit}`);
+    const response = await this.get<{ data: any[]; pagination: any }>(`/audit?page=${page}&limit=${limit}`);
+    if (!response.success) {
+      return { data: { data: [], pagination: { page: 1, limit, total: 0, hasNext: false, hasPrevious: false } }, success: false, error: response.error };
+    }
+    return response;
   }
 
   async getUsers(): Promise<ApiResponse<any[]>> {
-    return this.get<any[]>('/users');
+    const response = await this.get<any[]>('/users');
+    if (!response.success) {
+      return { data: [], success: false, error: response.error };
+    }
+    return response;
   }
 
   async createUser(userData: any): Promise<ApiResponse<any>> {
