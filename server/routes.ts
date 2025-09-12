@@ -389,9 +389,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/settlements", async (req, res) => {
     try {
       const settlementData = insertSettlementSchema.parse(req.body);
+      
+      // Get current period if not provided
+      const period = settlementData.period || new Date().toISOString().slice(0, 7); // YYYY-MM
+      
+      // Get ledger entry for this profile and period to calculate amount
+      const ledgerEntries = await storage.getLedgerEntriesByPeriod(period);
+      const profileLedger = ledgerEntries.find(entry => entry.profileId === settlementData.profileId);
+      
+      // Calculate amount and message from ledger data
+      let calculatedAmount = settlementData.amount;
+      let calculatedMessage = settlementData.message;
+      
+      if (profileLedger) {
+        calculatedAmount = Math.abs(parseFloat(profileLedger.balance)).toString();
+        const profile = await storage.getProfile(settlementData.profileId);
+        const isOwed = parseFloat(profileLedger.balance) < 0;
+        calculatedMessage = `${period} settlement for ${profile?.name}: ${isOwed ? 'Amount owed' : 'Amount receivable'} ₹${calculatedAmount}`;
+      }
+      
       const settlement = await storage.createSettlement({
         ...settlementData,
         id: crypto.randomUUID(),
+        period,
+        amount: calculatedAmount,
+        message: calculatedMessage,
         createdAt: new Date(),
         sentAt: settlementData.status === "sent" ? new Date() : null,
       });
@@ -402,12 +424,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "CREATE",
         resource: "Settlement",
         resourceId: settlement.id,
-        details: `Created settlement for profile: ${settlement.profileId}`,
+        details: `Created settlement for profile: ${settlement.profileId}, period: ${period}, amount: ₹${calculatedAmount}`,
         ipAddress: req.ip,
       });
 
       res.status(201).json(settlement);
     } catch (error) {
+      console.error("Settlement creation error:", error);
       res.status(400).json({ error: "Invalid settlement data" });
     }
   });

@@ -69,6 +69,7 @@ export class MemStorage implements IStorage {
     // Initialize with sample data
     this.initializeSampleData();
     this.initializeSampleTransactions();
+    this.initializeSampleSettlements();
   }
 
   // Helper method to convert User to UserPublic (remove password)
@@ -197,6 +198,50 @@ export class MemStorage implements IStorage {
     this.transactions.set(uplinkTransaction.id, uplinkTransaction);
     this.transactions.set(downlineTransaction1.id, downlineTransaction1);
     this.transactions.set(downlineTransaction2.id, downlineTransaction2);
+  }
+
+  private initializeSampleSettlements() {
+    const now = new Date();
+    
+    // Sample settlement for uplink
+    const uplinkSettlement: Settlement = {
+      id: randomUUID(),
+      profileId: "uplink-1",
+      period: "2025-09",
+      amount: "1500.00",
+      message: "Weekly settlement for uplink-1: Amount owed ₹1,500",
+      status: "sent",
+      createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      sentAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+    };
+    
+    // Sample settlement for downline 1
+    const downlineSettlement1: Settlement = {
+      id: randomUUID(),
+      profileId: "downline-1",
+      period: "2025-09",
+      amount: "1254.00",
+      message: "Weekly settlement for Agent Kumar: Amount receivable ₹1,254",
+      status: "sent",
+      createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      sentAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+    };
+    
+    // Sample pending settlement for downline 2
+    const downlineSettlement2: Settlement = {
+      id: randomUUID(),
+      profileId: "downline-2",
+      period: "2025-09",
+      amount: "782.00",
+      message: "Weekly settlement for Agent Sharma: Amount receivable ₹782",
+      status: "pending",
+      createdAt: now,
+      sentAt: null,
+    };
+    
+    this.settlements.set(uplinkSettlement.id, uplinkSettlement);
+    this.settlements.set(downlineSettlement1.id, downlineSettlement1);
+    this.settlements.set(downlineSettlement2.id, downlineSettlement2);
   }
 
   // User methods

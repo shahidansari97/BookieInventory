@@ -6,17 +6,48 @@ import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import SettlementModal from "@/components/modals/settlement-modal";
 import MessagePreviewModal from "@/components/modals/message-preview-modal";
-import { mockSettlements, mockProfiles } from "@/lib/mock-data";
-import { type Settlement } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { type Settlement, type Profile } from "@shared/schema";
 
 export default function Settlement() {
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
+  const { toast } = useToast();
+
+  // Fetch settlements and profiles
+  const { data: settlements = [], isLoading: isLoadingSettlements } = useQuery<Settlement[]>({
+    queryKey: ["/api/settlements"],
+  });
+
+  const { data: profiles = [] } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
+
+  // Create settlement mutation
+  const createSettlementMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/settlements", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settlements"] });
+      setIsSettlementModalOpen(false);
+      toast({
+        title: "Success",
+        description: "Settlement sent successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send settlement",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleSendSettlement = (data: any) => {
-    console.log("Settlement sent:", data);
-    // In a real app, this would call an API
+    createSettlementMutation.mutate(data);
   };
 
   const handlePreviewMessage = (settlement: Settlement) => {
@@ -25,33 +56,44 @@ export default function Settlement() {
   };
 
   const handleResendMessage = (settlementId: string) => {
-    console.log("Resend message:", settlementId);
-    // In a real app, this would call an API
+    toast({
+      title: "Info",
+      description: "Resend functionality will be implemented with WhatsApp integration",
+    });
   };
 
   const selectedProfile = selectedSettlement 
-    ? mockProfiles.find(p => p.id === selectedSettlement.profileId) || null
+    ? profiles.find(p => p.id === selectedSettlement.profileId) || null
     : null;
 
   const columns = [
     {
       key: "createdAt",
       title: "Date",
-      render: (value: Date) => value.toLocaleDateString("en-IN"),
+      render: (value: string | Date) => {
+        const date = typeof value === "string" ? new Date(value) : value;
+        return date.toLocaleDateString("en-IN");
+      },
     },
     {
       key: "period",
       title: "Period",
       render: (value: string) => {
-        const [start, end] = value.split('_');
-        return `${new Date(start).toLocaleDateString("en-IN")} - ${new Date(end).toLocaleDateString("en-IN")}`;
+        // Handle YYYY-MM format
+        if (value.match(/^\d{4}-\d{2}$/)) {
+          const [year, month] = value.split('-');
+          const date = new Date(parseInt(year), parseInt(month) - 1);
+          return date.toLocaleDateString("en-IN", { year: 'numeric', month: 'long' });
+        }
+        // Fallback for other formats
+        return value;
       },
     },
     {
       key: "profileId",
       title: "Profile",
       render: (value: string) => {
-        const profile = mockProfiles.find(p => p.id === value);
+        const profile = profiles.find(p => p.id === value);
         return profile?.name || "Unknown";
       },
     },
@@ -148,13 +190,22 @@ export default function Settlement() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Scheduled Date:</span>
                 <span className="font-medium" data-testid="next-settlement-date">
-                  Monday, Jan 22, 2024
+                  {(() => {
+                    const nextMonday = new Date();
+                    nextMonday.setDate(nextMonday.getDate() + (1 + 7 - nextMonday.getDay()) % 7);
+                    return nextMonday.toLocaleDateString("en-IN", { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    });
+                  })()}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Profiles to Settle:</span>
                 <span className="font-medium" data-testid="next-settlement-profiles">
-                  3 profiles
+                  {profiles.filter(p => p.isActive).length} profiles
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -182,11 +233,18 @@ export default function Settlement() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Messages Sent Today:</span>
-                <span className="font-medium" data-testid="messages-sent-today">12</span>
+                <span className="font-medium" data-testid="messages-sent-today">
+                  {settlements.filter(s => {
+                    const today = new Date().toDateString();
+                    return s.createdAt && new Date(s.createdAt).toDateString() === today;
+                  }).length}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Failed Deliveries:</span>
-                <span className="font-medium text-destructive" data-testid="failed-deliveries">0</span>
+                <span className="font-medium text-destructive" data-testid="failed-deliveries">
+                  {settlements.filter(s => s.status === "failed").length}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -199,11 +257,15 @@ export default function Settlement() {
           <CardTitle>Settlement History</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable
-            data={mockSettlements}
-            columns={columns}
-            testId="settlement-history-table"
-          />
+          {isLoadingSettlements ? (
+            <div className="p-4 text-center text-muted-foreground">Loading settlements...</div>
+          ) : (
+            <DataTable
+              data={settlements}
+              columns={columns}
+              testId="settlement-history-table"
+            />
+          )}
         </CardContent>
       </Card>
 
