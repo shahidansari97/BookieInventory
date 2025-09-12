@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import ProfileModal from "@/components/modals/profile-modal";
-import { mockProfiles } from "@/lib/mock-data";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { type Profile, type InsertProfile } from "@shared/schema";
 
 export default function Profiles() {
@@ -23,8 +25,81 @@ export default function Profiles() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { toast } = useToast();
 
-  const filteredProfiles = mockProfiles.filter(profile => {
+  // Fetch profiles from API
+  const { data: profiles = [], isLoading } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
+
+  // Create profile mutation
+  const createProfileMutation = useMutation({
+    mutationFn: async (data: InsertProfile) => {
+      const response = await apiRequest("POST", "/api/profiles", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
+      toast({
+        title: "Success",
+        description: "Profile created successfully",
+      });
+      setIsModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertProfile> }) => {
+      const response = await apiRequest("PUT", `/api/profiles/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+      setIsModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete profile mutation
+  const deleteProfileMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/profiles/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
+      toast({
+        title: "Success",
+        description: "Profile deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredProfiles = profiles.filter(profile => {
     const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          profile.phone.includes(searchTerm);
     const matchesType = typeFilter === "all" || profile.type === typeFilter;
@@ -46,13 +121,17 @@ export default function Profiles() {
   };
 
   const handleSubmitProfile = (data: InsertProfile) => {
-    console.log("Profile submitted:", data);
-    // In a real app, this would call an API
+    if (selectedProfile) {
+      updateProfileMutation.mutate({ id: selectedProfile.id, data });
+    } else {
+      createProfileMutation.mutate(data);
+    }
   };
 
   const handleDeleteProfile = (profileId: string) => {
-    console.log("Delete profile:", profileId);
-    // In a real app, this would call an API
+    if (confirm("Are you sure you want to delete this profile?")) {
+      deleteProfileMutation.mutate(profileId);
+    }
   };
 
   const columns = [
@@ -229,6 +308,7 @@ export default function Profiles() {
         data={filteredProfiles}
         columns={columns}
         testId="profiles-table"
+        loading={isLoading}
       />
 
       {/* Profile Modal */}

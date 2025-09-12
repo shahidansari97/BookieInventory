@@ -22,6 +22,7 @@ interface DataTableProps<T> {
   columns: Column<T>[];
   itemsPerPage?: number;
   testId?: string;
+  loading?: boolean;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -29,6 +30,7 @@ export default function DataTable<T extends { id: string }>({
   columns,
   itemsPerPage = 10,
   testId = "data-table",
+  loading = false,
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -65,7 +67,20 @@ export default function DataTable<T extends { id: string }>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentData.map((row) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="text-center py-8">
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : currentData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
+                  No data available
+                </TableCell>
+              </TableRow>
+            ) : (
+              currentData.map((row) => (
               <TableRow
                 key={row.id}
                 className="border-b border-border/50 hover:bg-muted/50"
@@ -88,7 +103,8 @@ export default function DataTable<T extends { id: string }>({
                   );
                 })}
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>

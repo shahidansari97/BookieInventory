@@ -95,8 +95,8 @@ export const insertProfileSchema = createInsertSchema(profiles).omit({
   name: z.string().min(3, "Name must be at least 3 characters"),
   phone: z.string().regex(/^\+\d{10,15}$/, "Invalid phone number format"),
   email: z.string().email().optional().or(z.literal("")),
-  ratePerPoint: z.string().transform(val => parseFloat(val)),
-  commissionPercentage: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
+  ratePerPoint: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val),
+  commissionPercentage: z.union([z.string(), z.number()]).optional().transform(val => val ? (typeof val === 'string' ? parseFloat(val) : val) : undefined),
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
