@@ -52,7 +52,11 @@ export default function Audit() {
     },
   });
 
-  const auditLogs = auditResponse?.data || [];
+  // Transform audit logs to ensure dates are Date objects
+  const auditLogs = auditResponse?.data?.map(log => ({
+    ...log,
+    createdAt: new Date(log.createdAt)
+  })) || [];
   const pagination = auditResponse?.pagination;
 
   const handleClearFilters = () => {
