@@ -51,26 +51,90 @@ class ApiClient {
   }
 
   async login(username: string, password: string): Promise<{ token: string; user: any } | null> {
-    // Demo implementation - replace with actual API call
-    if ((username === 'admin' && password === 'admin123') || 
-        (username === 'assistant' && password === 'assistant123')) {
+    try {
+      const response = await this.request<{ token: string; user: any }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
       
-      const token = `demo_token_${username}_${Date.now()}`;
-      await SecureStore.setItemAsync('auth_token', token);
+      if (response.success && response.data) {
+        await SecureStore.setItemAsync('auth_token', response.data.token);
+        await SecureStore.setItemAsync('user_data', JSON.stringify(response.data.user));
+        return response.data;
+      }
       
-      return {
-        token,
-        user: {
-          username,
-          role: username === 'admin' ? 'bookie' : 'assistant'
-        }
-      };
+      return null;
+    } catch (error) {
+      console.error('Login error:', error);
+      return null;
     }
-    return null;
+  }
+
+  async getCurrentUser(): Promise<any | null> {
+    try {
+      const userData = await SecureStore.getItemAsync('user_data');
+      return userData ? JSON.parse(userData) : null;
+    } catch {
+      return null;
+    }
   }
 
   async logout(): Promise<void> {
     await SecureStore.deleteItemAsync('auth_token');
+    await SecureStore.deleteItemAsync('user_data');
+  }
+
+  // Add specific API methods for mobile app
+  async getProfiles(): Promise<ApiResponse<any[]>> {
+    return this.get<any[]>('/profiles');
+  }
+
+  async getTransactions(page: number = 1, limit: number = 10): Promise<ApiResponse<{ data: any[]; pagination: any }>> {
+    return this.get<{ data: any[]; pagination: any }>(`/transactions?page=${page}&limit=${limit}`);
+  }
+
+  async createTransaction(transactionData: any): Promise<ApiResponse<any>> {
+    return this.post<any>('/transactions', transactionData);
+  }
+
+  async getLedgerEntries(period?: string): Promise<ApiResponse<any[]>> {
+    const endpoint = period ? `/ledger?period=${period}` : '/ledger';
+    return this.get<any[]>(endpoint);
+  }
+
+  async calculateLedger(period: string): Promise<ApiResponse<any>> {
+    return this.post<any>('/ledger/calculate', { period });
+  }
+
+  async getReports(period?: string, type?: string): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (period) params.append('period', period);
+    if (type) params.append('type', type);
+    const endpoint = `/reports${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.get<any>(endpoint);
+  }
+
+  async getAuditLogs(page: number = 1, limit: number = 10): Promise<ApiResponse<{ data: any[]; pagination: any }>> {
+    return this.get<{ data: any[]; pagination: any }>(`/audit?page=${page}&limit=${limit}`);
+  }
+
+  async getUsers(): Promise<ApiResponse<any[]>> {
+    return this.get<any[]>('/users');
+  }
+
+  async createUser(userData: any): Promise<ApiResponse<any>> {
+    return this.post<any>('/users', userData);
+  }
+
+  async updateUser(id: string, userData: any): Promise<ApiResponse<any>> {
+    return this.request<any>(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(id: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/users/${id}`, { method: 'DELETE' });
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {

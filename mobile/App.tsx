@@ -9,17 +9,29 @@ import * as SecureStore from 'expo-secure-store';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 import ProfilesScreen from './src/screens/ProfilesScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
 import AddTransactionScreen from './src/screens/AddTransactionScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
+import SettlementScreen from './src/screens/SettlementScreen';
+import AuditLogsScreen from './src/screens/AuditLogsScreen';
+import UsersScreen from './src/screens/UsersScreen';
+import AddUserScreen from './src/screens/AddUserScreen';
 
 type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Dashboard: undefined;
+  AdminDashboard: undefined;
   Profiles: undefined;
   Transactions: undefined;
   AddTransaction: undefined;
+  Reports: undefined;
+  Settlement: undefined;
+  AuditLogs: undefined;
+  Users: undefined;
+  AddUser: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -28,6 +40,7 @@ const queryClient = new QueryClient();
 // Auth Context
 interface AuthContextType {
   isAuthenticated: boolean;
+  user: any | null;
   login: (token: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -44,6 +57,7 @@ export const useAuth = () => {
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<any | null>(null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -52,20 +66,36 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuthStatus = async () => {
     try {
       const token = await SecureStore.getItemAsync('auth_token');
-      setIsAuthenticated(!!token);
+      const userData = await SecureStore.getItemAsync('user_data');
+      
+      if (token && userData) {
+        setIsAuthenticated(true);
+        setUser(JSON.parse(userData));
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
     } catch (error) {
       setIsAuthenticated(false);
+      setUser(null);
     }
   };
 
   const login = async (token: string) => {
     await SecureStore.setItemAsync('auth_token', token);
+    // Get user data that was already stored during login
+    const userData = await SecureStore.getItemAsync('user_data');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
     setIsAuthenticated(true);
   };
 
   const logout = async () => {
     await SecureStore.deleteItemAsync('auth_token');
+    await SecureStore.deleteItemAsync('user_data');
     setIsAuthenticated(false);
+    setUser(null);
   };
 
   if (isAuthenticated === null) {
@@ -73,7 +103,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -94,7 +124,8 @@ export default function App() {
 }
 
 function AppNavigator() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === 'bookie';
 
   return (
     <Stack.Navigator 
@@ -119,16 +150,31 @@ function AppNavigator() {
           />
         </>
       ) : (
-        // App Stack  
+        // App Stack - Role-based navigation
         <>
-          <Stack.Screen 
-            name="Dashboard" 
-            component={DashboardScreen}
-            options={{ 
-              title: 'Bookie System',
-              headerLeft: () => null // Disable back button
-            }}
-          />
+          {isAdmin ? (
+            // Admin Dashboard
+            <Stack.Screen 
+              name="AdminDashboard" 
+              component={AdminDashboardScreen}
+              options={{ 
+                title: 'Admin Panel',
+                headerLeft: () => null // Disable back button
+              }}
+            />
+          ) : (
+            // User Dashboard
+            <Stack.Screen 
+              name="Dashboard" 
+              component={DashboardScreen}
+              options={{ 
+                title: 'Bookie System',
+                headerLeft: () => null // Disable back button
+              }}
+            />
+          )}
+          
+          {/* Common screens available to all users */}
           <Stack.Screen 
             name="Profiles" 
             component={ProfilesScreen}
@@ -144,6 +190,37 @@ function AppNavigator() {
             component={AddTransactionScreen}
             options={{ title: 'Add Transaction' }}
           />
+          <Stack.Screen 
+            name="Reports" 
+            component={ReportsScreen}
+            options={{ title: 'Reports & Analytics' }}
+          />
+          <Stack.Screen 
+            name="Settlement" 
+            component={SettlementScreen}
+            options={{ title: 'Settlement' }}
+          />
+          
+          {/* Admin-only screens */}
+          {isAdmin && (
+            <>
+              <Stack.Screen 
+                name="AuditLogs" 
+                component={AuditLogsScreen}
+                options={{ title: 'Audit Trail' }}
+              />
+              <Stack.Screen 
+                name="Users" 
+                component={UsersScreen}
+                options={{ title: 'User Management' }}
+              />
+              <Stack.Screen 
+                name="AddUser" 
+                component={AddUserScreen}
+                options={{ title: 'Add User' }}
+              />
+            </>
+          )}
         </>
       )}
     </Stack.Navigator>
