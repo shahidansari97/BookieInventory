@@ -108,9 +108,9 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   type: z.enum(["taken", "given"]),
   profileId: z.string().min(1, "Profile is required"),
   date: z.string().transform(val => new Date(val)),
-  points: z.string().transform(val => parseInt(val)),
-  ratePerPoint: z.string().transform(val => parseFloat(val)),
-  commissionPercentage: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
+  points: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val),
+  ratePerPoint: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val),
+  commissionPercentage: z.union([z.string(), z.number()]).optional().transform(val => val ? (typeof val === 'string' ? parseFloat(val) : val) : undefined),
 });
 
 export const insertSettlementSchema = createInsertSchema(settlements).omit({

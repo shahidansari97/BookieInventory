@@ -123,7 +123,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(transaction);
     } catch (error) {
-      res.status(400).json({ error: "Invalid transaction data" });
+      console.error("Transaction creation error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: "Invalid transaction data" });
+      }
+    }
+  });
+
+  app.put("/api/transactions/:id", async (req, res) => {
+    try {
+      const transactionData = insertTransactionSchema.partial().parse(req.body);
+      const transaction = await storage.updateTransaction(req.params.id, transactionData);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: "system", // In a real app, get from session
+        action: "UPDATE",
+        resource: "Transaction",
+        resourceId: transaction.id,
+        details: `Updated transaction: ${transaction.type} - ${transaction.points} points`,
+        ipAddress: req.ip,
+      });
+
+      res.json(transaction);
+    } catch (error) {
+      console.error("Transaction update error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: "Failed to update transaction" });
+      }
+    }
+  });
+
+  app.delete("/api/transactions/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteTransaction(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: "system", // In a real app, get from session
+        action: "DELETE",
+        resource: "Transaction",
+        resourceId: req.params.id,
+        details: `Deleted transaction: ${req.params.id}`,
+        ipAddress: req.ip,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete transaction" });
     }
   });
 

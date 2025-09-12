@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { insertTransactionSchema, type InsertTransaction, type Transaction, type Profile } from "@shared/schema";
-import { mockProfiles } from "@/lib/mock-data";
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -45,6 +45,11 @@ export default function TransactionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalAmount, setTotalAmount] = useState("₹0.00");
   const isEditing = !!transaction;
+
+  // Fetch profiles from API
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
 
   const form = useForm<InsertTransaction>({
     resolver: zodResolver(insertTransactionSchema),
@@ -80,14 +85,18 @@ export default function TransactionModal({
 
   useEffect(() => {
     if (transaction) {
-      const profile = mockProfiles.find(p => p.id === transaction.profileId);
+      // Handle date as either Date object or string
+      const transactionDate = transaction.date instanceof Date 
+        ? transaction.date 
+        : new Date(transaction.date);
+      
       form.reset({
         type: transaction.type as "taken" | "given",
         profileId: transaction.profileId,
-        date: transaction.date.toISOString().split('T')[0],
+        date: transactionDate.toISOString().split('T')[0],
         points: transaction.points.toString(),
-        ratePerPoint: transaction.ratePerPoint,
-        commissionPercentage: transaction.commissionPercentage || "",
+        ratePerPoint: transaction.ratePerPoint.toString(),
+        commissionPercentage: transaction.commissionPercentage?.toString() || "",
         notes: transaction.notes || "",
       });
     } else {
@@ -101,9 +110,9 @@ export default function TransactionModal({
         notes: "",
       });
     }
-  }, [transaction, form]);
+  }, [transaction, form, profiles]);
 
-  const filteredProfiles = mockProfiles.filter(profile => {
+  const filteredProfiles = profiles.filter(profile => {
     if (watchType === "taken") return profile.type === "uplink";
     if (watchType === "given") return profile.type === "downline";
     return true;

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Filter, Edit, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +15,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import TransactionModal from "@/components/modals/transaction-modal";
-import { mockTransactions, mockProfiles } from "@/lib/mock-data";
-import { type Transaction, type InsertTransaction } from "@shared/schema";
+import { type Transaction, type InsertTransaction, type Profile } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Transactions() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,9 +26,20 @@ export default function Transactions() {
   const [dateTo, setDateTo] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [profileFilter, setProfileFilter] = useState("all");
+  const { toast } = useToast();
 
-  const filteredTransactions = mockTransactions.filter(transaction => {
-    const transactionDate = transaction.date.toISOString().split('T')[0];
+  // Fetch transactions from API
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+  });
+
+  // Fetch profiles from API
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
+
+  const filteredTransactions = transactions.filter(transaction => {
+    const transactionDate = new Date(transaction.date).toISOString().split('T')[0];
     const matchesDateFrom = !dateFrom || transactionDate >= dateFrom;
     const matchesDateTo = !dateTo || transactionDate <= dateTo;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
@@ -45,21 +58,86 @@ export default function Transactions() {
     setIsModalOpen(true);
   };
 
+  // Create transaction mutation
+  const createTransactionMutation = useMutation({
+    mutationFn: (data: InsertTransaction) => apiRequest("POST", "/api/transactions", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Success",
+        description: "Transaction created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update transaction mutation
+  const updateTransactionMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<InsertTransaction> }) => 
+      apiRequest("PUT", `/api/transactions/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete transaction mutation
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/transactions/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmitTransaction = (data: InsertTransaction) => {
-    console.log("Transaction submitted:", data);
-    // In a real app, this would call an API
+    if (selectedTransaction) {
+      updateTransactionMutation.mutate({ id: selectedTransaction.id, data });
+    } else {
+      createTransactionMutation.mutate(data);
+    }
   };
 
   const handleDeleteTransaction = (transactionId: string) => {
-    console.log("Delete transaction:", transactionId);
-    // In a real app, this would call an API
+    if (confirm("Are you sure you want to delete this transaction?")) {
+      deleteTransactionMutation.mutate(transactionId);
+    }
   };
 
   const columns = [
     {
       key: "date",
       title: "Date",
-      render: (value: Date) => value.toLocaleDateString("en-IN"),
+      render: (value: Date | string) => {
+        const date = value instanceof Date ? value : new Date(value);
+        return date.toLocaleDateString("en-IN");
+      },
     },
     {
       key: "type",
@@ -92,7 +170,7 @@ export default function Transactions() {
       key: "profileId",
       title: "Profile",
       render: (value: string) => {
-        const profile = mockProfiles.find(p => p.id === value);
+        const profile = profiles.find(p => p.id === value);
         return profile?.name || "Unknown";
       },
     },
@@ -215,7 +293,7 @@ export default function Transactions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Profiles</SelectItem>
-                  {mockProfiles.map((profile) => (
+                  {profiles.map((profile) => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.name}
                     </SelectItem>
@@ -247,6 +325,7 @@ export default function Transactions() {
       <DataTable
         data={filteredTransactions}
         columns={columns}
+        loading={transactionsLoading}
         testId="transactions-table"
       />
 

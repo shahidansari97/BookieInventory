@@ -64,6 +64,68 @@ export class MemStorage implements IStorage {
     this.ledgerEntries = new Map();
     this.settlements = new Map();
     this.auditLogs = new Map();
+    
+    // Initialize with sample data
+    this.initializeSampleData();
+  }
+
+  private initializeSampleData() {
+    // Create sample profiles for testing
+    const sampleProfiles: Profile[] = [
+      {
+        id: "uplink-1",
+        type: "uplink",
+        name: "Super Exchange",
+        phone: "+919876543210",
+        email: "contact@superexchange.com",
+        ratePerPoint: 1.50,
+        commissionPercentage: null,
+        notes: "Primary uplink partner",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "uplink-2",
+        type: "uplink",
+        name: "Premium Exchange",
+        phone: "+919876543211",
+        email: "info@premiumexchange.com",
+        ratePerPoint: 1.45,
+        commissionPercentage: null,
+        notes: "Secondary uplink partner",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "downline-1",
+        type: "downline",
+        name: "Agent Kumar",
+        phone: "+919876543212",
+        email: "kumar@agents.com",
+        ratePerPoint: 1.65,
+        commissionPercentage: 5.0,
+        notes: "Top performing agent",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "downline-2",
+        type: "downline",
+        name: "Agent Sharma",
+        phone: "+919876543213",
+        email: "sharma@agents.com",
+        ratePerPoint: 1.70,
+        commissionPercentage: 8.0,
+        notes: "Reliable downline agent",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    // Add sample profiles to storage
+    sampleProfiles.forEach(profile => {
+      this.profiles.set(profile.id, profile);
+    });
   }
 
   // User methods
