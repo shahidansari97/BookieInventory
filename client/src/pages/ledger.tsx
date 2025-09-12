@@ -3,26 +3,59 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
-import { mockLedgerEntries, mockProfiles } from "@/lib/mock-data";
-import { type LedgerEntry } from "@shared/schema";
+import { type LedgerEntry, type Profile } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Ledger() {
+  const { toast } = useToast();
+
+  // Fetch ledger entries and profiles from API
+  const { data: ledgerEntries = [], isLoading: isLoadingLedger } = useQuery<LedgerEntry[]>({
+    queryKey: ["/api/ledger"],
+  });
+
+  const { data: profiles = [] } = useQuery<Profile[]>({
+    queryKey: ["/api/profiles"],
+  });
+
+  // Calculate ledger mutation
+  const calculateLedgerMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/ledger/calculate"),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger"] });
+      const entriesCount = data.entriesCalculated || 0;
+      const period = data.period || "current period";
+      toast({
+        title: "Success",
+        description: `Ledger calculation completed! ${entriesCount} entries calculated for period ${period}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to calculate ledger",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCalculateLedger = () => {
-    console.log("Calculate ledger");
-    // In a real app, this would trigger ledger calculation
-    alert("Ledger calculation completed successfully!");
+    calculateLedgerMutation.mutate();
   };
 
-  const uplinksTotal = mockLedgerEntries
+  // Calculate totals from real data
+  const uplinksTotal = ledgerEntries
     .filter(entry => {
-      const profile = mockProfiles.find(p => p.id === entry.profileId);
+      const profile = profiles.find(p => p.id === entry.profileId);
       return profile?.type === "uplink";
     })
     .reduce((sum, entry) => sum + Math.abs(parseFloat(entry.balance)), 0);
 
-  const downlinesTotal = mockLedgerEntries
+  const downlinesTotal = ledgerEntries
     .filter(entry => {
-      const profile = mockProfiles.find(p => p.id === entry.profileId);
+      const profile = profiles.find(p => p.id === entry.profileId);
       return profile?.type === "downline";
     })
     .reduce((sum, entry) => sum + parseFloat(entry.balance), 0);
@@ -34,7 +67,7 @@ export default function Ledger() {
       key: "profileId",
       title: "Profile",
       render: (value: string) => {
-        const profile = mockProfiles.find(p => p.id === value);
+        const profile = profiles.find(p => p.id === value);
         return profile?.name || "Unknown";
       },
     },
@@ -42,7 +75,7 @@ export default function Ledger() {
       key: "profileId",
       title: "Type",
       render: (value: string) => {
-        const profile = mockProfiles.find(p => p.id === value);
+        const profile = profiles.find(p => p.id === value);
         return (
           <Badge 
             variant={profile?.type === "uplink" ? "default" : "secondary"}
@@ -51,9 +84,9 @@ export default function Ledger() {
                 ? "bg-primary/10 text-primary" 
                 : "bg-green-100 text-green-600"
             }
-            data-testid={`ledger-type-${profile?.type}`}
+            data-testid={`ledger-type-${profile?.type || "unknown"}`}
           >
-            {profile?.type?.charAt(0).toUpperCase() + profile?.type?.slice(1)}
+            {profile?.type ? profile.type.charAt(0).toUpperCase() + profile.type.slice(1) : "Unknown"}
           </Badge>
         );
       },
@@ -81,7 +114,6 @@ export default function Ledger() {
       title: "Balance",
       align: "right" as const,
       render: (value: string, row: LedgerEntry) => {
-        const profile = mockProfiles.find(p => p.id === row.profileId);
         const amount = parseFloat(value);
         const isNegative = amount < 0;
         const displayAmount = Math.abs(amount);
@@ -127,9 +159,10 @@ export default function Ledger() {
           onClick={handleCalculateLedger}
           className="mt-4 md:mt-0"
           data-testid="calculate-ledger-button"
+          disabled={calculateLedgerMutation.isPending}
         >
           <Calculator className="w-4 h-4 mr-2" />
-          Calculate Now
+          {calculateLedgerMutation.isPending ? "Calculating..." : "Calculate Now"}
         </Button>
       </div>
 
@@ -141,14 +174,30 @@ export default function Ledger() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Super Exchange</span>
-                <span className="font-medium text-destructive" data-testid="uplink-balance">
-                  ₹2,25,000
-                </span>
-              </div>
+              {ledgerEntries
+                .filter(entry => {
+                  const profile = profiles.find(p => p.id === entry.profileId);
+                  return profile?.type === "uplink";
+                })
+                .map(entry => {
+                  const profile = profiles.find(p => p.id === entry.profileId);
+                  const amount = Math.abs(parseFloat(entry.balance));
+                  return (
+                    <div key={entry.id} className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{profile?.name}</span>
+                      <span className="font-medium text-destructive" data-testid="uplink-balance">
+                        ₹{amount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  );
+                })}
+              {uplinksTotal === 0 && (
+                <div className="text-sm text-muted-foreground text-center">
+                  No uplink balances
+                </div>
+              )}
               <div className="text-xs text-muted-foreground">
-                Last calculated: 2024-01-15 09:00 AM
+                Total owed: ₹{uplinksTotal.toLocaleString("en-IN")}
               </div>
             </div>
           </CardContent>
@@ -160,17 +209,30 @@ export default function Ledger() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Agent Kumar</span>
-                <span className="font-medium text-green-600" data-testid="downline-balance-kumar">
-                  +₹43,125
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Agent Sharma</span>
-                <span className="font-medium text-green-600" data-testid="downline-balance-sharma">
-                  +₹27,540
-                </span>
+              {ledgerEntries
+                .filter(entry => {
+                  const profile = profiles.find(p => p.id === entry.profileId);
+                  return profile?.type === "downline";
+                })
+                .map(entry => {
+                  const profile = profiles.find(p => p.id === entry.profileId);
+                  const amount = parseFloat(entry.balance);
+                  return (
+                    <div key={entry.id} className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{profile?.name}</span>
+                      <span className="font-medium text-green-600" data-testid={`downline-balance-${profile?.name?.toLowerCase().replace(" ", "-")}`}>
+                        +₹{amount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  );
+                })}
+              {downlinesTotal === 0 && (
+                <div className="text-sm text-muted-foreground text-center">
+                  No downline balances
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">
+                Total receivable: ₹{downlinesTotal.toLocaleString("en-IN")}
               </div>
             </div>
           </CardContent>
@@ -204,7 +266,7 @@ export default function Ledger() {
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
-            data={mockLedgerEntries}
+            data={ledgerEntries}
             columns={columns}
             testId="ledger-table"
           />

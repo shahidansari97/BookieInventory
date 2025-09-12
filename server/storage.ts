@@ -68,6 +68,7 @@ export class MemStorage implements IStorage {
     
     // Initialize with sample data
     this.initializeSampleData();
+    this.initializeSampleTransactions();
   }
 
   // Helper method to convert User to UserPublic (remove password)
@@ -143,6 +144,59 @@ export class MemStorage implements IStorage {
     sampleProfiles.forEach(profile => {
       this.profiles.set(profile.id, profile);
     });
+  }
+
+  private initializeSampleTransactions() {
+    const now = new Date();
+    
+    // Sample uplink transaction
+    const uplinkTransaction: Transaction = {
+      id: randomUUID(),
+      date: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Yesterday
+      type: "taken",
+      profileId: "uplink-1",
+      points: 1000,
+      ratePerPoint: "1.50",
+      commissionPercentage: null,
+      totalAmount: "1500.00",
+      notes: "Sample uplink transaction",
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    // Sample downline transaction 1
+    const downlineTransaction1: Transaction = {
+      id: randomUUID(),
+      date: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Yesterday
+      type: "given", 
+      profileId: "downline-1",
+      points: 800,
+      ratePerPoint: "1.65",
+      commissionPercentage: "5.0",
+      totalAmount: "1320.00",
+      notes: "Sample downline transaction",
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    // Sample downline transaction 2
+    const downlineTransaction2: Transaction = {
+      id: randomUUID(),
+      date: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Yesterday
+      type: "given",
+      profileId: "downline-2", 
+      points: 500,
+      ratePerPoint: "1.70",
+      commissionPercentage: "8.0",
+      totalAmount: "850.00",
+      notes: "Sample downline transaction 2",
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.transactions.set(uplinkTransaction.id, uplinkTransaction);
+    this.transactions.set(downlineTransaction1.id, downlineTransaction1);
+    this.transactions.set(downlineTransaction2.id, downlineTransaction2);
   }
 
   // User methods
@@ -358,6 +412,10 @@ export class MemStorage implements IStorage {
     const updatedEntry = { ...entry, ...entryData };
     this.ledgerEntries.set(id, updatedEntry);
     return updatedEntry;
+  }
+
+  async deleteLedgerEntry(id: string): Promise<boolean> {
+    return this.ledgerEntries.delete(id);
   }
 
   // Settlement methods

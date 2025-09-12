@@ -273,8 +273,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/ledger/calculate", async (req, res) => {
     try {
-      // In a real implementation, this would calculate balances based on transactions
-      // For now, return success message
+      // Calculate ledger entries based on real transaction data
+      const transactions = await storage.getAllTransactions();
+      const profiles = await storage.getAllProfiles();
+      
+      console.log(`Ledger calculation started - Found ${transactions.length} transactions and ${profiles.length} profiles`);
+      
+      // Clear existing ledger entries
+      const existingEntries = await storage.getAllLedgerEntries();
+      for (const entry of existingEntries) {
+        await storage.deleteLedgerEntry(entry.id);
+      }
+      
+      // Calculate balances per profile
+      const profileBalances = new Map<string, {
+        profileId: string,
+        totalPoints: number,
+        totalAmount: number,
+        commissionAmount: number,
+        transactionCount: number,
+        averageRate: number
+      }>();
+      
+      for (const transaction of transactions) {
+        const existing = profileBalances.get(transaction.profileId) || {
+          profileId: transaction.profileId,
+          totalPoints: 0,
+          totalAmount: 0,
+          commissionAmount: 0,
+          transactionCount: 0,
+          averageRate: 0
+        };
+        
+        const transactionAmount = parseFloat(transaction.totalAmount);
+        const commissionAmount = transaction.commissionPercentage 
+          ? (transactionAmount * parseFloat(transaction.commissionPercentage)) / 100 
+          : 0;
+        
+        existing.totalPoints += transaction.points;
+        existing.totalAmount += transactionAmount;
+        existing.commissionAmount += commissionAmount;
+        existing.transactionCount += 1;
+        existing.averageRate = existing.totalAmount / existing.totalPoints;
+        
+        profileBalances.set(transaction.profileId, existing);
+      }
+      
+      // Create ledger entries
+      const currentDate = new Date();
+      const period = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      for (const [profileId, balance] of profileBalances) {
+        const profile = profiles.find(p => p.id === profileId);
+        if (!profile) continue;
+        
+        // Calculate net balance (positive = receive, negative = owe)
+        let netBalance = 0;
+        if (profile.type === "uplink") {
+          // For uplinks, we owe them money (negative balance)
+          netBalance = -(balance.totalAmount + balance.commissionAmount);
+        } else {
+          // For downlines, they owe us money (positive balance)  
+          netBalance = balance.totalAmount - balance.commissionAmount;
+        }
+        
+        const ledgerEntry = {
+          id: crypto.randomUUID(),
+          profileId: profileId,
+          period: period,
+          totalPoints: balance.totalPoints,
+          averageRate: balance.averageRate.toFixed(2),
+          commission: balance.commissionAmount > 0 ? balance.commissionAmount.toFixed(2) : null,
+          balance: netBalance.toFixed(2),
+          status: "pending" as const,
+          createdAt: currentDate,
+          updatedAt: currentDate
+        };
+        
+        await storage.createLedgerEntry(ledgerEntry);
+      }
       
       // Create audit log
       await storage.createAuditLog({
@@ -282,12 +359,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "CALCULATE",
         resource: "Ledger",
         resourceId: null,
-        details: "Triggered manual ledger calculation",
+        details: `Calculated ledger for ${profileBalances.size} profiles in period ${period}`,
         ipAddress: req.ip,
       });
 
-      res.json({ message: "Ledger calculation completed successfully" });
+      const newEntries = await storage.getAllLedgerEntries();
+      res.json({ 
+        message: "Ledger calculation completed successfully",
+        entriesCalculated: newEntries.length,
+        period: period,
+        entries: newEntries
+      });
     } catch (error) {
+      console.error("Ledger calculation error:", error);
       res.status(500).json({ error: "Failed to calculate ledger" });
     }
   });
