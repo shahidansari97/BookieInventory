@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Filter } from "lucide-react";
+import { Filter, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
-import { mockAuditLogs, mockUsers } from "@/lib/mock-data";
-import { type AuditLog } from "@shared/schema";
+import { type AuditLog, type UserPublic } from "@shared/schema";
 
 export default function Audit() {
   const [dateFrom, setDateFrom] = useState("");
@@ -22,15 +22,25 @@ export default function Audit() {
   const [actionFilter, setActionFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
 
-  const filteredAuditLogs = mockAuditLogs.filter(log => {
-    const logDate = log.createdAt.toISOString().split('T')[0];
-    const matchesDateFrom = !dateFrom || logDate >= dateFrom;
-    const matchesDateTo = !dateTo || logDate <= dateTo;
-    const matchesAction = actionFilter === "all" || log.action === actionFilter;
-    const matchesUser = userFilter === "all" || log.userId === userFilter;
-    
-    return matchesDateFrom && matchesDateTo && matchesAction && matchesUser;
+  // Fetch users for filter dropdown
+  const { data: users = [] } = useQuery<UserPublic[]>({
+    queryKey: ["/api/users"],
   });
+
+  // Fetch audit logs with current filters
+  const { data: auditResponse, isLoading } = useQuery({
+    queryKey: ["/api/audit", { 
+      startDate: dateFrom || undefined,
+      endDate: dateTo || undefined,
+      action: actionFilter !== "all" ? actionFilter : undefined,
+      userId: userFilter !== "all" ? userFilter : undefined,
+      page: 1,
+      limit: 100
+    }],
+  });
+
+  const auditLogs = auditResponse?.data || [];
+  const pagination = auditResponse?.pagination;
 
   const handleClearFilters = () => {
     setDateFrom("");
@@ -68,7 +78,7 @@ export default function Audit() {
       key: "userId",
       title: "User",
       render: (value: string) => {
-        const user = mockUsers.find(u => u.id === value);
+        const user = users.find(u => u.id === value);
         return (
           <div className="font-medium" data-testid={`audit-user-${value}`}>
             {user?.username || "Unknown"}
@@ -179,7 +189,7 @@ export default function Audit() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Users</SelectItem>
-                  {mockUsers.map((user) => (
+                  {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.username}
                     </SelectItem>
@@ -203,11 +213,25 @@ export default function Audit() {
       </Card>
 
       {/* Audit Log Table */}
-      <DataTable
-        data={filteredAuditLogs}
-        columns={columns}
-        testId="audit-log-table"
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8" data-testid="audit-loading">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading audit logs...</span>
+        </div>
+      ) : (
+        <DataTable
+          data={auditLogs}
+          columns={columns}
+          testId="audit-log-table"
+        />
+      )}
+      
+      {pagination && (
+        <div className="mt-4 text-sm text-muted-foreground text-center" data-testid="audit-pagination-info">
+          Showing {pagination.page === 1 ? 1 : (pagination.page - 1) * pagination.limit + 1} to{" "}
+          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} entries
+        </div>
+      )}
     </div>
   );
 }

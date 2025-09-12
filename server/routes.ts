@@ -541,9 +541,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Audit log routes
   app.get("/api/audit", async (req, res) => {
     try {
-      const auditLogs = await storage.getAuditLogs();
-      res.json(auditLogs);
+      const { 
+        startDate, 
+        endDate, 
+        action, 
+        userId, 
+        resource, 
+        page = "1", 
+        limit = "50" 
+      } = req.query;
+      
+      let auditLogs: AuditLog[] = [];
+      
+      // Get audit logs based on filters
+      if (startDate && endDate) {
+        auditLogs = await storage.getAuditLogsByDateRange(
+          new Date(startDate as string), 
+          new Date(endDate as string)
+        );
+      } else if (userId && userId !== "all") {
+        auditLogs = await storage.getAuditLogsByUser(userId as string);
+      } else {
+        auditLogs = await storage.getAuditLogs();
+      }
+      
+      // Apply additional filters
+      let filteredLogs = auditLogs.filter(log => {
+        const matchesAction = !action || action === "all" || log.action === action;
+        const matchesUser = !userId || userId === "all" || log.userId === userId;
+        const matchesResource = !resource || resource === "all" || log.resource === resource;
+        
+        return matchesAction && matchesUser && matchesResource;
+      });
+      
+      // Sort by most recent first
+      filteredLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Pagination
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+      const startIndex = (pageNum - 1) * limitNum;
+      const endIndex = startIndex + limitNum;
+      const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+      
+      res.json({
+        data: paginatedLogs,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: filteredLogs.length,
+          totalPages: Math.ceil(filteredLogs.length / limitNum),
+          hasNext: endIndex < filteredLogs.length,
+          hasPrev: pageNum > 1
+        }
+      });
     } catch (error) {
+      console.error("Audit logs fetch error:", error);
       res.status(500).json({ error: "Failed to fetch audit logs" });
     }
   });
