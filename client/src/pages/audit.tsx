@@ -27,16 +27,29 @@ export default function Audit() {
     queryKey: ["/api/users"],
   });
 
+  // Build query parameters for audit logs
+  const buildAuditQuery = () => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('startDate', dateFrom);
+    if (dateTo) params.append('endDate', dateTo);
+    if (actionFilter !== "all") params.append('action', actionFilter);
+    if (userFilter !== "all") params.append('userId', userFilter);
+    params.append('page', '1');
+    params.append('limit', '100');
+    return params.toString();
+  };
+
   // Fetch audit logs with current filters
   const { data: auditResponse, isLoading } = useQuery({
-    queryKey: ["/api/audit", { 
-      startDate: dateFrom || undefined,
-      endDate: dateTo || undefined,
-      action: actionFilter !== "all" ? actionFilter : undefined,
-      userId: userFilter !== "all" ? userFilter : undefined,
-      page: 1,
-      limit: 100
-    }],
+    queryKey: ["/api/audit", dateFrom, dateTo, actionFilter, userFilter],
+    queryFn: async () => {
+      const queryString = buildAuditQuery();
+      const response = await fetch(`/api/audit?${queryString}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audit logs');
+      }
+      return response.json();
+    },
   });
 
   const auditLogs = auditResponse?.data || [];
