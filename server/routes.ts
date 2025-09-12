@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProfileSchema, insertTransactionSchema, insertUserSchema, insertSettlementSchema, insertAuditLogSchema } from "@shared/schema";
+import { insertProfileSchema, insertTransactionSchema, insertUserSchema, insertSettlementSchema, insertAuditLogSchema, type UserPublic } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Profile routes

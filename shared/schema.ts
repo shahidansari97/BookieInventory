@@ -131,6 +131,7 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 
 // Types
 export type User = typeof users.$inferSelect;
+export type UserPublic = Omit<User, 'password'>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Profile = typeof profiles.$inferSelect;

@@ -1,15 +1,16 @@
-import { type User, type InsertUser, type Profile, type InsertProfile, type Transaction, type InsertTransaction, type LedgerEntry, type Settlement, type AuditLog, type InsertAuditLog } from "@shared/schema";
+import { type User, type UserPublic, type InsertUser, type Profile, type InsertProfile, type Transaction, type InsertTransaction, type LedgerEntry, type Settlement, type AuditLog, type InsertAuditLog } from "@shared/schema";
 import { randomUUID } from "crypto";
+import * as bcrypt from "bcrypt";
 
 // Comprehensive storage interface for the Bookie Inventory Management System
 export interface IStorage {
   // User management
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
+  getUser(id: string): Promise<UserPublic | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>; // Keep internal for auth
+  createUser(user: InsertUser): Promise<UserPublic>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<UserPublic>;
   deleteUser(id: string): Promise<boolean>;
-  getAllUsers(): Promise<User[]>;
+  getAllUsers(): Promise<UserPublic[]>;
 
   // Profile management
   getProfile(id: string): Promise<Profile | undefined>;
@@ -69,6 +70,18 @@ export class MemStorage implements IStorage {
     this.initializeSampleData();
   }
 
+  // Helper method to convert User to UserPublic (remove password)
+  private toUserPublic(user: User): UserPublic {
+    const { password, ...userPublic } = user;
+    return userPublic;
+  }
+
+  // Helper method to hash password
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = 12;
+    return await bcrypt.hash(password, saltRounds);
+  }
+
   private initializeSampleData() {
     // Create sample profiles for testing
     const sampleProfiles: Profile[] = [
@@ -78,9 +91,10 @@ export class MemStorage implements IStorage {
         name: "Super Exchange",
         phone: "+919876543210",
         email: "contact@superexchange.com",
-        ratePerPoint: 1.50,
+        ratePerPoint: "1.50",
         commissionPercentage: null,
         notes: "Primary uplink partner",
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -90,9 +104,10 @@ export class MemStorage implements IStorage {
         name: "Premium Exchange",
         phone: "+919876543211",
         email: "info@premiumexchange.com",
-        ratePerPoint: 1.45,
+        ratePerPoint: "1.45",
         commissionPercentage: null,
         notes: "Secondary uplink partner",
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -102,9 +117,10 @@ export class MemStorage implements IStorage {
         name: "Agent Kumar",
         phone: "+919876543212",
         email: "kumar@agents.com",
-        ratePerPoint: 1.65,
-        commissionPercentage: 5.0,
+        ratePerPoint: "1.65",
+        commissionPercentage: "5.0",
         notes: "Top performing agent",
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -114,9 +130,10 @@ export class MemStorage implements IStorage {
         name: "Agent Sharma",
         phone: "+919876543213",
         email: "sharma@agents.com",
-        ratePerPoint: 1.70,
-        commissionPercentage: 8.0,
+        ratePerPoint: "1.70",
+        commissionPercentage: "8.0",
         notes: "Reliable downline agent",
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -129,8 +146,9 @@ export class MemStorage implements IStorage {
   }
 
   // User methods
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getUser(id: string): Promise<UserPublic | undefined> {
+    const user = this.users.get(id);
+    return user ? this.toUserPublic(user) : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -139,34 +157,42 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: InsertUser): Promise<UserPublic> {
     const id = randomUUID();
+    const hashedPassword = await this.hashPassword(insertUser.password);
     const user: User = { 
-      ...insertUser, 
+      ...insertUser,
+      password: hashedPassword,
       id, 
       isActive: true,
       lastLogin: null,
       createdAt: new Date()
     };
     this.users.set(id, user);
-    return user;
+    return this.toUserPublic(user);
   }
 
-  async updateUser(id: string, userData: Partial<InsertUser>): Promise<User> {
+  async updateUser(id: string, userData: Partial<InsertUser>): Promise<UserPublic> {
     const user = this.users.get(id);
     if (!user) throw new Error("User not found");
     
-    const updatedUser = { ...user, ...userData };
+    // Hash password if it's being updated
+    let updatedData = { ...userData };
+    if (userData.password) {
+      updatedData.password = await this.hashPassword(userData.password);
+    }
+    
+    const updatedUser = { ...user, ...updatedData };
     this.users.set(id, updatedUser);
-    return updatedUser;
+    return this.toUserPublic(updatedUser);
   }
 
   async deleteUser(id: string): Promise<boolean> {
     return this.users.delete(id);
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+  async getAllUsers(): Promise<UserPublic[]> {
+    return Array.from(this.users.values()).map(user => this.toUserPublic(user));
   }
 
   // Profile methods
@@ -188,6 +214,10 @@ export class MemStorage implements IStorage {
       ...insertProfile, 
       id,
       isActive: true,
+      email: insertProfile.email || null,
+      notes: insertProfile.notes || null,
+      ratePerPoint: insertProfile.ratePerPoint.toString(),
+      commissionPercentage: insertProfile.commissionPercentage ? insertProfile.commissionPercentage.toString() : null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -199,7 +229,26 @@ export class MemStorage implements IStorage {
     const profile = this.profiles.get(id);
     if (!profile) throw new Error("Profile not found");
     
-    const updatedProfile = { ...profile, ...profileData, updatedAt: new Date() };
+    // Convert numeric fields to strings and handle null/undefined properly
+    const convertedData: Partial<Profile> = {};
+    
+    // Copy all properties except the ones we need to convert
+    Object.keys(profileData).forEach(key => {
+      if (key !== 'ratePerPoint' && key !== 'commissionPercentage' && key !== 'email') {
+        (convertedData as any)[key] = (profileData as any)[key];
+      }
+    });
+    if (profileData.ratePerPoint !== undefined) {
+      convertedData.ratePerPoint = profileData.ratePerPoint.toString();
+    }
+    if (profileData.commissionPercentage !== undefined) {
+      convertedData.commissionPercentage = profileData.commissionPercentage ? profileData.commissionPercentage.toString() : null;
+    }
+    if (profileData.email !== undefined) {
+      convertedData.email = profileData.email || null;
+    }
+    
+    const updatedProfile = { ...profile, ...convertedData, updatedAt: new Date() };
     this.profiles.set(id, updatedProfile);
     return updatedProfile;
   }
@@ -243,6 +292,9 @@ export class MemStorage implements IStorage {
     const transaction: Transaction = { 
       ...insertTransaction,
       id,
+      notes: insertTransaction.notes || null,
+      ratePerPoint: insertTransaction.ratePerPoint.toString(),
+      commissionPercentage: insertTransaction.commissionPercentage ? insertTransaction.commissionPercentage.toString() : null,
       totalAmount: totalAmount.toFixed(2),
       createdAt: new Date(),
       updatedAt: new Date()
@@ -255,7 +307,24 @@ export class MemStorage implements IStorage {
     const transaction = this.transactions.get(id);
     if (!transaction) throw new Error("Transaction not found");
     
-    const updatedTransaction = { ...transaction, ...transactionData, updatedAt: new Date() };
+    // Convert numeric fields to strings and handle null/undefined properly
+    const convertedData: Partial<Transaction> = {};
+    
+    // Copy all properties except the ones we need to convert
+    Object.keys(transactionData).forEach(key => {
+      if (key !== 'ratePerPoint' && key !== 'commissionPercentage') {
+        (convertedData as any)[key] = (transactionData as any)[key];
+      }
+    });
+    
+    if (transactionData.ratePerPoint !== undefined) {
+      convertedData.ratePerPoint = transactionData.ratePerPoint.toString();
+    }
+    if (transactionData.commissionPercentage !== undefined) {
+      convertedData.commissionPercentage = transactionData.commissionPercentage ? transactionData.commissionPercentage.toString() : null;
+    }
+    
+    const updatedTransaction = { ...transaction, ...convertedData, updatedAt: new Date() };
     this.transactions.set(id, updatedTransaction);
     return updatedTransaction;
   }
@@ -324,6 +393,8 @@ export class MemStorage implements IStorage {
     const log: AuditLog = { 
       ...insertLog, 
       id,
+      resourceId: insertLog.resourceId || null,
+      ipAddress: insertLog.ipAddress || null,
       createdAt: new Date()
     };
     this.auditLogs.set(id, log);
@@ -331,9 +402,11 @@ export class MemStorage implements IStorage {
   }
 
   async getAuditLogs(): Promise<AuditLog[]> {
-    return Array.from(this.auditLogs.values()).sort((a, b) => 
-      b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    return Array.from(this.auditLogs.values()).sort((a, b) => {
+      const aTime = a.createdAt?.getTime() || 0;
+      const bTime = b.createdAt?.getTime() || 0;
+      return bTime - aTime;
+    });
   }
 
   async getAuditLogsByUser(userId: string): Promise<AuditLog[]> {
@@ -342,7 +415,7 @@ export class MemStorage implements IStorage {
 
   async getAuditLogsByDateRange(startDate: Date, endDate: Date): Promise<AuditLog[]> {
     return Array.from(this.auditLogs.values()).filter(l => 
-      l.createdAt >= startDate && l.createdAt <= endDate
+      l.createdAt && l.createdAt >= startDate && l.createdAt <= endDate
     );
   }
 }

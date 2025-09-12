@@ -4,18 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import UserModal from "@/components/modals/user-modal";
-import { type User, type InsertUser } from "@shared/schema";
+import { type UserPublic, type InsertUser } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserPublic | null>(null);
   const { toast } = useToast();
 
   // Fetch users from API
-  const { data: users = [], isLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading } = useQuery<UserPublic[]>({
     queryKey: ["/api/users"],
   });
 
@@ -84,7 +84,7 @@ export default function Users() {
     setIsModalOpen(true);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: UserPublic) => {
     setSelectedUser(user);
     setIsModalOpen(true);
   };
@@ -178,7 +178,7 @@ export default function Users() {
       key: "actions",
       title: "Actions",
       align: "center" as const,
-      render: (_: any, row: User) => (
+      render: (_: any, row: UserPublic) => (
         <div className="flex justify-center space-x-2">
           <Button
             variant="ghost"
