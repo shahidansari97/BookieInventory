@@ -82,18 +82,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href={item.path}
                 onClick={onClose}
                 data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className={cn(
+                  "flex items-center space-x-3 p-3 rounded-lg transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                )}
               >
-                <a
-                  className={cn(
-                    "flex items-center space-x-3 p-3 rounded-lg transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </a>
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
               </Link>
             );
           })}

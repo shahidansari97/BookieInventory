@@ -12,7 +12,7 @@ export const initializeGlobalErrorHandlers = () => {
       customTitle: "Unhandled Error",
       customMessage: "An unexpected error occurred. Please try again.",
       showToast: true,
-      logError: true
+      logError: false // Disable logging to prevent circular dependency
     });
 
     // Prevent the default browser behavior
@@ -27,25 +27,9 @@ export const initializeGlobalErrorHandlers = () => {
       customTitle: "Application Error",
       customMessage: "An unexpected error occurred. Please refresh the page.",
       showToast: true,
-      logError: true
+      logError: false // Disable logging to prevent circular dependency
     });
   });
-
-  // Handle console errors (optional)
-  const originalConsoleError = console.error;
-  console.error = (...args) => {
-    // Call original console.error
-    originalConsoleError.apply(console, args);
-    
-    // Check if it's an error object
-    const error = args.find(arg => arg instanceof Error);
-    if (error && process.env.NODE_ENV === 'development') {
-      errorService.handleError(error, {
-        showToast: false, // Don't show toast for console errors
-        logError: true
-      });
-    }
-  };
 };
 
 /**

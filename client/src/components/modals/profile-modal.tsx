@@ -91,6 +91,7 @@ export default function ProfileModal({
       notes: "",
       status: true,
     },
+    enableReinitialize: true,
     validationSchema: profileValidationSchema,
     onSubmit: async (values: ProfileFormValues) => {
       try {
@@ -120,6 +121,7 @@ export default function ProfileModal({
     },
   });
 
+  // Handle form initialization when profile changes
   useEffect(() => {
     if (profile) {
       formik.setValues({
@@ -131,23 +133,29 @@ export default function ProfileModal({
         notes: profile.notes || "",
         status: true,
       });
-    } else {
+    } else if (isOpen) {
+      // Reset form when opening for new profile
       formik.resetForm();
     }
-  }, [profile]);
+  }, [profile, isOpen]); // Only depend on profile and isOpen
+
+  const handleClose = () => {
+    formik.resetForm();
+    onClose();
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md" data-testid="profile-modal">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl" data-testid="profile-modal">
         <DialogHeader>
           <DialogTitle data-testid="profile-modal-title">
             {isEditing ? "Edit Profile" : "Add Profile"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={formik.handleSubmit} className="space-y-4">
+        <form onSubmit={formik.handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Transaction Types Dropdown */}
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <Label htmlFor="transactionTypeId">
               Transaction Type <span className="text-destructive">*</span>
             </Label>
@@ -190,50 +198,50 @@ export default function ProfileModal({
             )}
           </div>
 
-           {/* Country Code Field */}
-           <div className="space-y-2">
-             <Label htmlFor="countryCode">
-               Country Code <span className="text-destructive">*</span>
-             </Label>
-             <Input
-               id="countryCode"
-               name="countryCode"
-               placeholder="+91"
-               value={formik.values.countryCode}
-               onChange={formik.handleChange}
-               onBlur={formik.handleBlur}
-               data-testid="profile-country-code-input"
-             />
-             {formik.touched.countryCode && formik.errors.countryCode && (
-               <p className="text-sm text-destructive">{formik.errors.countryCode}</p>
-             )}
-           </div>
+          {/* Country Code Field */}
+          <div className="space-y-2">
+            <Label htmlFor="countryCode">
+              Country Code <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="countryCode"
+              name="countryCode"
+              placeholder="+91"
+              value={formik.values.countryCode}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              data-testid="profile-country-code-input"
+            />
+            {formik.touched.countryCode && formik.errors.countryCode && (
+              <p className="text-sm text-destructive">{formik.errors.countryCode}</p>
+            )}
+          </div>
 
-           {/* Phone Field */}
-           <div className="space-y-2">
-             <Label htmlFor="phone">
-               Phone Number <span className="text-destructive">*</span>
-             </Label>
-             <Input
-               id="phone"
-               name="phone"
-               type="tel"
-               inputMode="numeric"
-               pattern="[0-9]*"
-               placeholder="9854784784"
-               value={formik.values.phone}
-               onChange={(e) => {
-                 // Only allow numeric input
-                 const value = e.target.value.replace(/[^0-9]/g, '');
-                 formik.setFieldValue('phone', value);
-               }}
-               onBlur={formik.handleBlur}
-               data-testid="profile-phone-input"
-             />
-             {formik.touched.phone && formik.errors.phone && (
-               <p className="text-sm text-destructive">{formik.errors.phone}</p>
-             )}
-           </div>
+          {/* Phone Field */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">
+              Phone Number <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="9854784784"
+              value={formik.values.phone}
+              onChange={(e) => {
+                // Only allow numeric input
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                formik.setFieldValue('phone', value);
+              }}
+              onBlur={formik.handleBlur}
+              data-testid="profile-phone-input"
+            />
+            {formik.touched.phone && formik.errors.phone && (
+              <p className="text-sm text-destructive">{formik.errors.phone}</p>
+            )}
+          </div>
 
           {/* Email Field */}
           <div className="space-y-2">
@@ -252,7 +260,6 @@ export default function ProfileModal({
               <p className="text-sm text-destructive">{formik.errors.email}</p>
             )}
           </div>
-
 
           {/* Status Field */}
           <div className="space-y-2">
@@ -277,7 +284,7 @@ export default function ProfileModal({
           </div>
 
           {/* Notes Field */}
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
@@ -294,11 +301,11 @@ export default function ProfileModal({
             )}
           </div>
 
-          <div className="flex space-x-3 pt-4">
+          <div className="flex space-x-3 pt-4 md:col-span-2">
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1"
               data-testid="profile-cancel-button"
             >

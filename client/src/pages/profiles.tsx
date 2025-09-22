@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,44 +25,85 @@ export default function Profiles() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Fetch profiles from API with pagination
-  const { data: profilesData, isLoading } = useQuery({
-    queryKey: ["profiles", currentPage, pageSize, searchTerm, typeFilter, statusFilter],
+  const { data: profilesData, isLoading, error } = useQuery({
+    queryKey: ["profiles", currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-      });
+      try {
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          limit: pageSize.toString(),
+        });
 
-      // Add search parameter if provided
-      if (searchTerm) {
-        params.append('search', searchTerm);
+        // Add search parameter if provided
+        if (debouncedSearchTerm) {
+          params.append('search', debouncedSearchTerm);
+        }
+
+        // Add type filter if not "all"
+        if (typeFilter !== "all") {
+          params.append('type', typeFilter);
+        }
+
+        // Add status filter if not "all"
+        if (statusFilter !== "all") {
+          const statusValue = statusFilter === "active" ? "true" : "false";
+          params.append('status', statusValue);
+        }
+
+        const response = await axios.get(`${API.PROFILE_INDEX}?${params.toString()}`);
+        
+        // Check if API call was successful
+        if (response.data.success === false) {
+          // Return empty data with success false for "not found" case
+          return {
+            success: false,
+            message: response.data.message || "No Profile Found",
+            data: null, // Keep data as null to match API response
+            totalPages: 0,
+            totalItems: 0
+          };
+        }
+        
+        // Validate response structure for successful response
+        if (!response.data || !Array.isArray(response.data.data)) {
+          throw new Error('Invalid API response structure');
+        }
+        
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching profiles:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch profiles. Please try again.",
+          variant: "destructive",
+        });
+        throw error;
       }
-
-      // Add type filter if not "all"
-      if (typeFilter !== "all") {
-        params.append('type', typeFilter);
-      }
-
-      // Add status filter if not "all"
-      if (statusFilter !== "all") {
-        params.append('status', statusFilter);
-      }
-
-      const response = await axios.get(`${API.PROFILE_INDEX}?${params.toString()}`);
-      return response.data;
     },
+    retry: 2,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const profiles = profilesData?.data || [];
-  const totalPages = Math.ceil((profilesData?.total || 0) / pageSize);
-  const totalItems = profilesData?.total || 0;
+  const totalPages = profilesData?.totalPages || 1;
+  const totalItems = profilesData?.totalItems || 0;
 
   // Delete profile mutation
   const deleteProfileMutation = useMutation({
@@ -114,7 +155,7 @@ export default function Profiles() {
     setCurrentPage(1); // Reset to first page when changing page size
   };
 
-  // Search handler with debounce
+  // Search handler
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1); // Reset to first page when searching
@@ -143,45 +184,42 @@ export default function Profiles() {
     {
       key: "name",
       title: "Name",
-      render: (value: string, row: Profile) => (
+      render: (value: string, row: any) => (
         <div>
           <div className="font-medium" data-testid={`profile-name-${row.id}`}>
             {value}
           </div>
           <div className="text-sm text-muted-foreground">
-            {row.notes || `${row.type} profile`}
+            {row.email}
           </div>
         </div>
       ),
     },
     {
-      key: "type",
+      key: "transactionType",
       title: "Type",
       render: (value: string) => (
         <Badge 
-          variant={value === "uplink" ? "default" : "secondary"}
+          variant={value === "UPLINK" ? "default" : "secondary"}
           className={
-            value === "uplink" 
+            value === "UPLINK" 
               ? "bg-primary/10 text-primary" 
               : "bg-green-100 text-green-600"
           }
           data-testid={`profile-type-${value}`}
         >
-          {value.charAt(0).toUpperCase() + value.slice(1)}
+          {value}
         </Badge>
       ),
     },
     {
       key: "phone",
       title: "Contact",
-      render: (value: string, row: Profile) => (
+      render: (value: string, row: any) => (
         <div>
-          <div data-testid={`profile-phone-${row.id}`}>{value}</div>
-          {row.email && (
-            <div className="text-sm text-muted-foreground" data-testid={`profile-email-${row.id}`}>
-              {row.email}
-            </div>
-          )}
+          <div data-testid={`profile-phone-${row.id}`}>
+            {row.country_code} {value}
+          </div>
         </div>
       ),
     },
@@ -189,19 +227,52 @@ export default function Profiles() {
       key: "ratePerPoint",
       title: "Rate/Point",
       align: "right" as const,
-      render: (value: string) => `₹${parseFloat(value).toFixed(2)}`,
+      render: (value: number) => `₹${value.toFixed(2)}`,
     },
     {
-      key: "commissionPercentage",
+      key: "commission",
       title: "Commission",
       align: "right" as const,
-      render: (value: string | null) => value ? `${parseFloat(value)}%` : "-",
+      render: (value: number) => `₹${value.toFixed(2)}`,
+    },
+    {
+      key: "wallet",
+      title: "Wallet",
+      align: "right" as const,
+      render: (value: number) => `₹${value.toFixed(2)}`,
+    },
+    {
+      key: "status",
+      title: "Status",
+      align: "center" as const,
+      render: (value: boolean) => (
+        <Badge 
+          variant={value ? "default" : "secondary"}
+          className={
+            value 
+              ? "bg-green-100 text-green-600" 
+              : "bg-red-100 text-red-600"
+          }
+        >
+          {value ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "createdAt",
+      title: "Created",
+      align: "center" as const,
+      render: (value: string) => (
+        <div className="text-sm text-muted-foreground">
+          {new Date(value).toLocaleDateString()}
+        </div>
+      ),
     },
     {
       key: "actions",
       title: "Actions",
       align: "center" as const,
-      render: (_: any, row: Profile) => (
+      render: (_: any, row: any) => (
         <div className="flex justify-center space-x-2">
           <Button
             variant="ghost"
@@ -271,8 +342,8 @@ export default function Profiles() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="uplink">Uplink</SelectItem>
-                  <SelectItem value="downline">Downline</SelectItem>
+                  <SelectItem value="UPLINK">UPLINK</SelectItem>
+                  <SelectItem value="DOWNLINE">DOWNLINE</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -305,15 +376,45 @@ export default function Profiles() {
       </Card>
 
       {/* Profiles Table */}
-      <DataTable
-        data={profiles}
-        columns={columns}
-        testId="profiles-table"
-        loading={isLoading}
-      />
+      {error ? (
+        <Card className="p-8 text-center">
+          <div className="text-destructive mb-4">
+            <h3 className="text-lg font-semibold">Failed to load profiles</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              There was an error loading the profiles. Please try again.
+            </p>
+          </div>
+          <Button 
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["profiles"] })}
+            variant="outline"
+          >
+            Retry
+          </Button>
+        </Card>
+      ) : profilesData?.success === false ? (
+        <Card className="p-8 text-center">
+          <div className="text-muted-foreground mb-4">
+            <h3 className="text-lg font-semibold">{profilesData.message || "No Profile Found"}</h3>
+          </div>
+          <Button 
+            onClick={handleClearFilters}
+            variant="outline"
+          >
+            Clear Filters
+          </Button>
+        </Card>
+      ) : (
+        <DataTable
+          data={profiles}
+          columns={columns}
+          testId="profiles-table"
+          loading={isLoading}
+        />
+      )}
 
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-between mt-6">
+      {/* Pagination Controls - Only show when there are results */}
+      {profilesData?.success !== false && !error && (
+        <div className="flex items-center justify-between mt-6">
         <div className="flex items-center space-x-2">
           <Label htmlFor="page-size">Show</Label>
           <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
@@ -375,18 +476,25 @@ export default function Profiles() {
         </div>
 
         <div className="text-sm text-muted-foreground">
-          Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} entries
+          {isLoading ? (
+            "Loading..."
+          ) : (
+            `Showing ${((currentPage - 1) * pageSize) + 1} to ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} entries`
+          )}
         </div>
       </div>
+      )}
 
       {/* Profile Modal */}
       <ProfileModal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
+          setSelectedProfile(null); // Reset selected profile
           queryClient.invalidateQueries({ queryKey: ["profiles"] });
         }}
         profile={selectedProfile}
+        onSubmit={() => {}} // ProfileModal handles its own API calls
       />
     </div>
   );
