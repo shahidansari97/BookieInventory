@@ -76,6 +76,7 @@ export default function ProfileModal({
     queryKey: ['transaction-types'],
     queryFn: async () => {
       const response = await axios.get(API.TRANSACTION_TYPES);
+      console.log('Transaction types loaded:', response.data.data || response.data);
       return response.data.data || response.data;
     },
     enabled: isOpen,
@@ -95,23 +96,40 @@ export default function ProfileModal({
     validationSchema: profileValidationSchema,
     onSubmit: async (values: ProfileFormValues) => {
       try {
-        // Call your profile creation API exactly like your curl
-        const response = await axios.post(API.PROFILE_CREATE, {
-          transactionTypeId: values.transactionTypeId,
-          name: values.name,
-          email: values.email,
-          country_code: values.countryCode,
-          phone: values.phone, // Send phone as separate field
-          notes: values.notes,
-          status: values.status,
-        });
+        let response;
+        
+        if (profile) {
+          // Update existing profile
+          response = await axios.post(API.PROFILE_UPDATE, {
+            id: profile.id,
+            transactionTypeId: values.transactionTypeId,
+            name: values.name,
+            email: values.email,
+            country_code: values.countryCode,
+            phone: values.phone,
+            notes: values.notes,
+            status: values.status,
+          });
+        } else {
+          // Create new profile
+          response = await axios.post(API.PROFILE_CREATE, {
+            transactionTypeId: values.transactionTypeId,
+            name: values.name,
+            email: values.email,
+            country_code: values.countryCode,
+            phone: values.phone,
+            notes: values.notes,
+            status: values.status,
+          });
+        }
 
         if (response.data.success === false) {
-          handleApi(new Error(response.data.message || 'Profile creation failed.'));
+          handleApi(new Error(response.data.message || 'Profile operation failed.'));
           return;
         }
 
-        success(response.data.message || "Profile created successfully!", "Profile Created");
+        const action = profile ? "updated" : "created";
+        success(response.data.message || `Profile ${action} successfully!`, `Profile ${action.charAt(0).toUpperCase() + action.slice(1)}`);
         
         // Close modal after successful API call
         onClose();
@@ -124,20 +142,31 @@ export default function ProfileModal({
   // Handle form initialization when profile changes
   useEffect(() => {
     if (profile) {
+      console.log('Setting form values for profile:', profile);
+      console.log('Profile transactionTypeId:', (profile as any).transactionTypeId);
       formik.setValues({
         transactionTypeId: (profile as any).transactionTypeId || "",
         name: profile.name,
         phone: profile.phone,
         email: profile.email || "",
-        countryCode: "+91",
-        notes: profile.notes || "",
-        status: true,
+        countryCode: (profile as any).country_code || "+91",
+        notes: (profile as any).notes || "",
+        status: (profile as any).status ?? true,
       });
     } else if (isOpen) {
       // Reset form when opening for new profile
       formik.resetForm();
     }
   }, [profile, isOpen]); // Only depend on profile and isOpen
+
+  // Update form when transaction types are loaded and we have a profile
+  useEffect(() => {
+    if (profile && transactionTypes.length > 0 && formik.values.transactionTypeId) {
+      console.log('Transaction types loaded, updating form with transactionTypeId:', formik.values.transactionTypeId);
+      // Force formik to re-render by setting the same value
+      formik.setFieldValue('transactionTypeId', formik.values.transactionTypeId);
+    }
+  }, [transactionTypes, profile, formik.values.transactionTypeId]);
 
   const handleClose = () => {
     formik.resetForm();
@@ -159,21 +188,32 @@ export default function ProfileModal({
             <Label htmlFor="transactionTypeId">
               Transaction Type <span className="text-destructive">*</span>
             </Label>
-            <Select 
-              onValueChange={(value) => formik.setFieldValue("transactionTypeId", value)}
-              value={formik.values.transactionTypeId}
-            >
-              <SelectTrigger data-testid="profile-transaction-type-select">
-                <SelectValue placeholder={isLoadingTypes ? "Loading..." : "Select Transaction Type"} />
-              </SelectTrigger>
-              <SelectContent>
-                {transactionTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingTypes ? (
+              <div className="flex items-center justify-center p-3 border rounded-md">
+                <div className="text-sm text-muted-foreground">Loading transaction types...</div>
+              </div>
+            ) : (
+              <Select 
+                key={`transaction-type-${transactionTypes.length}-${formik.values.transactionTypeId}`}
+                onValueChange={(value) => {
+                  console.log('Transaction type changed to:', value);
+                  formik.setFieldValue("transactionTypeId", value);
+                }}
+                value={formik.values.transactionTypeId}
+              >
+                <SelectTrigger data-testid="profile-transaction-type-select">
+                  <SelectValue placeholder="Select Transaction Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {transactionTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {/* Debug info */}
             {formik.touched.transactionTypeId && formik.errors.transactionTypeId && (
               <p className="text-sm text-destructive">{formik.errors.transactionTypeId}</p>
             )}

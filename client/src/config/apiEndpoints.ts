@@ -6,6 +6,7 @@ export const API = {
   PROFILES: '/api/v1/profiles',
   PROFILE_INDEX: '/api/v1/profile/index',
   PROFILE_CREATE: '/api/v1/profile/create',
+  PROFILE_UPDATE: '/api/v1/profile/update',
   TRANSACTIONS: '/api/v1/transactions',
   TRANSACTION_TYPES: '/api/v1/transaction-type/all',
   LEDGER: '/api/v1/ledger',
