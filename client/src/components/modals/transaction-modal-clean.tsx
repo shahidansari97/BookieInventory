@@ -60,18 +60,42 @@ interface TransactionFormValues {
   paymentStatus: boolean;
 }
 
-// Validation schema - simplified for debugging
+// Validation schema - matches your curl API exactly
 const transactionValidationSchema = Yup.object({
-  transactionTypeId: Yup.string().required("Transaction type is required"),
-  profileId: Yup.string().required("Profile is required"),
-  toProfileId: Yup.string().optional(),
+  transactionTypeId: Yup.string()
+    .required("Transaction type is required")
+    .min(1, "Please select a transaction type"),
+  profileId: Yup.string()
+    .required("Profile is required")
+    .min(1, "Please select a profile"),
+  toProfileId: Yup.string().when('transactionTypeId', {
+    is: (transactionTypeId: string) => {
+      // Check if this is a DOWNLINE transaction type
+      return transactionTypeId && transactionTypeId !== '';
+    },
+    then: (schema: any) => schema.required("To Profile is required for DOWNLINE transactions"),
+    otherwise: (schema: any) => schema.optional(),
+  }),
   toUserId: Yup.string().nullable(),
-  date: Yup.string().required("Date is required"),
-  amount: Yup.number().required("Amount is required").min(1, "Amount must be at least 1"),
-  ratePerPoint: Yup.number().required("Rate per point is required").min(0.01, "Rate must be at least 0.01"),
-  notes: Yup.string().optional(),
-  status: Yup.boolean().required("Status is required"),
-  paymentStatus: Yup.boolean().required("Payment status is required"),
+  date: Yup.string()
+    .required("Date is required")
+    .matches(/^\d{2}-\d{2}-\d{2}$/, "Date must be in DD-MM-YY format"),
+  amount: Yup.number()
+    .required("Amount is required")
+    .min(1, "Amount must be at least 1")
+    .max(99999999999, "Amount cannot exceed 99,999,999,999")
+    .integer("Amount must be a whole number"),
+  ratePerPoint: Yup.number()
+    .required("Rate per point is required")
+    .min(0.01, "Rate must be at least 0.01")
+    .max(999999, "Rate cannot exceed 999,999"),
+  notes: Yup.string()
+    .max(500, "Notes cannot exceed 500 characters")
+    .optional(),
+  status: Yup.boolean()
+    .required("Status is required"),
+  paymentStatus: Yup.boolean()
+    .required("Payment status is required"),
 });
 
 export default function TransactionModal({
@@ -81,42 +105,13 @@ export default function TransactionModal({
 }: TransactionModalProps) {
   const { handleApi, success } = useError();
 
-  // Helpers to convert between DD-MM-YYYY (API) and YYYY-MM-DD (input[type=date])
-  const toInputDate = (ddmmyyyy: string) => {
-    const m = ddmmyyyy.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (m) {
-      return `${m[3]}-${m[2]}-${m[1]}`; // YYYY-MM-DD
-    }
-    // fallback to today
-    const now = new Date();
-    const y = now.getFullYear();
-    const mo = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${mo}-${d}`;
-  };
-
-  const fromInputDate = (yyyymmdd: string) => {
-    const m = yyyymmdd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) {
-      return `${m[3]}-${m[2]}-${m[1]}`; // DD-MM-YYYY
-    }
-    return yyyymmdd;
-  };
-
   const formik = useFormik({
     initialValues: {
       transactionTypeId: "",
       profileId: "",
       toProfileId: "",
-      toUserId: null as string | null,
-      // DD-MM-YYYY format for API
-      date: (() => {
-        const now = new Date();
-        const d = String(now.getDate()).padStart(2, '0');
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const y = String(now.getFullYear());
-        return `${d}-${m}-${y}`;
-      })(),
+      toUserId: null,
+      date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'), // DD-MM-YY format
       amount: 0,
       ratePerPoint: 0,
       notes: "",
@@ -125,63 +120,46 @@ export default function TransactionModal({
     },
     enableReinitialize: true,
     validationSchema: transactionValidationSchema,
-     onSubmit: async (values: TransactionFormValues, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
-       try {
-         console.log('Form submitted with values:', values);
-         console.log('Form validation errors:', formik.errors);
-         console.log('Form is valid:', formik.isValid);
-         
-         // Determine toUserId based on transaction type
-         const selectedTransactionType = transactionTypes.find(t => t.id === values.transactionTypeId);
-         const isDownlineTransaction = selectedTransactionType?.name === 'DOWNLINE';
-         
-         // Calculate toUserId value
-         let toUserIdValue: string | null = null;
-         if (isDownlineTransaction && values.toProfileId) {
-           toUserIdValue = values.toProfileId;
-         }
-         
-         console.log('Transaction type:', selectedTransactionType?.name);
-         console.log('Is DOWNLINE transaction:', isDownlineTransaction);
-         console.log('toProfileId value:', values.toProfileId);
-         console.log('Calculated toUserId:', toUserIdValue);
-         
-         // Prepare payload exactly matching your curl API
-         const payload = {
-           transactionTypeId: values.transactionTypeId,
-           profileId: values.profileId,
-           toUserId: toUserIdValue,
-           amount: values.amount,
-           ratePerPoint: values.ratePerPoint,
-           notes: values.notes,
-           date: values.date,
-           status: values.status,
-           paymentStatus: values.paymentStatus,
-         };
+    onSubmit: async (values: TransactionFormValues) => {
+      try {
+        // Determine toUserId based on transaction type
+        const selectedTransactionType = transactionTypes.find(t => t.id === values.transactionTypeId);
+        const isDownlineTransaction = selectedTransactionType?.name === 'DOWNLINE';
+        
+        // Prepare payload exactly matching your curl API
+        const payload = {
+          transactionTypeId: values.transactionTypeId,
+          profileId: values.profileId,
+          toUserId: isDownlineTransaction ? values.toProfileId : null,
+          amount: values.amount,
+          ratePerPoint: values.ratePerPoint,
+          notes: values.notes,
+          date: values.date,
+          status: values.status,
+          paymentStatus: values.paymentStatus,
+        };
 
-         console.log('Transaction API Payload:', JSON.stringify(payload, null, 2));
-         
-         const response = await axios.post(API.TRANSACTION_CREATE, payload);
+        console.log('Transaction API Payload:', JSON.stringify(payload, null, 2));
+        
+        const response = await axios.post(API.TRANSACTION_CREATE, payload);
 
-         if (response.data.success === false) {
-           handleApi(new Error(response.data.message || 'Transaction creation failed.'));
-           return;
-         }
+        if (response.data.success === false) {
+          handleApi(new Error(response.data.message || 'Transaction creation failed.'));
+          return;
+        }
 
-         success(response.data.message || "Transaction created successfully!", "Transaction Created");
-         
-         // Call parent onSubmit callback
-         onSubmit(payload);
-         
-         // Close modal after successful API call
-         onClose();
-       } catch (error) {
-         console.error('Transaction creation error:', error);
-         handleApi(error);
-       } finally {
-         setSubmitting(false);
-       }
-     },
+        success(response.data.message || "Transaction created successfully!", "Transaction Created");
+        
+        // Call parent onSubmit callback
+        onSubmit(payload);
+        
+        // Close modal after successful API call
+        onClose();
+      } catch (error) {
+        console.error('Transaction creation error:', error);
+        handleApi(error);
+      }
+    },
   });
 
   // Fetch transaction types
@@ -254,7 +232,7 @@ export default function TransactionModal({
     if (formik.values.transactionTypeId) {
       formik.setFieldValue('profileId', '');
       formik.setFieldValue('toProfileId', '');
-      formik.setFieldValue('toUserId', null as string | null);
+      formik.setFieldValue('toUserId', null);
     }
   }, [formik.values.transactionTypeId]);
 
@@ -370,16 +348,21 @@ export default function TransactionModal({
             {/* Date Field */}
             <div className="space-y-2">
               <Label htmlFor="date">
-                Date <span className="text-destructive">*</span>
+                Date (DD-MM-YY) <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="date"
                 name="date"
-                type="date"
-                value={toInputDate(formik.values.date)}
+                type="text"
+                placeholder="22-09-25"
+                value={formik.values.date}
                 onChange={(e) => {
-                  const apiDate = fromInputDate(e.target.value);
-                  formik.setFieldValue('date', apiDate);
+                  // Allow only numbers and dashes, format as DD-MM-YY
+                  let value = e.target.value.replace(/[^0-9-]/g, '');
+                  if (value.length > 8) value = value.slice(0, 8);
+                  if (value.length === 2 && !value.includes('-')) value += '-';
+                  if (value.length === 5 && value.split('-').length === 2) value += '-';
+                  formik.setFieldValue('date', value);
                 }}
                 onBlur={formik.handleBlur}
                 data-testid="transaction-date-input"
@@ -536,24 +519,6 @@ export default function TransactionModal({
                 className="flex-1"
                 disabled={formik.isSubmitting}
                 data-testid="transaction-submit-button"
-                onClick={(e) => {
-                  console.log('Submit button clicked');
-                  console.log('Form values:', formik.values);
-                  console.log('Form errors:', formik.errors);
-                  console.log('Form touched:', formik.touched);
-                  console.log('Form is valid:', formik.isValid);
-                  
-                  // Trigger form validation
-                  formik.validateForm().then((errors: Record<string, string>) => {
-                    console.log('Validation errors:', errors);
-                    if (Object.keys(errors).length === 0) {
-                      console.log('Form is valid, submitting...');
-                      formik.submitForm();
-                    } else {
-                      console.log('Form has validation errors, not submitting');
-                    }
-                  });
-                }}
               >
                 {formik.isSubmitting ? "Creating..." : "Create Transaction"}
               </Button>
