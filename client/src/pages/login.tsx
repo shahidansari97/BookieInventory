@@ -1,86 +1,57 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrendingUp, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import axios from '@/config/axiosInstance';
+import { API } from '@/config/apiEndpoints';
+import { useError } from '@/hooks/useError';
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+const loginValidationSchema = Yup.object({
+  email: Yup.string().email("Valid email is required").required("Email is required"),
+  password: Yup.string().required("Password is required"),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type LoginForm = { email: string; password: string };
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const { toast } = useToast();
+  const { handleApi, success } = useError();
 
-  const form = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
+  const formik = useFormik({
+    initialValues: { email: "", password: "" },
+    validationSchema: loginValidationSchema,
+    onSubmit: async (values: LoginForm) => {
+      setIsLoading(true);
+
+      try {
+        const response = await axios.post(API.LOGIN, values);
+
+        if (response.data.success === false) {
+          handleApi(new Error(response.data.message || 'Login failed.'));
+          return;
+        }
+
+        success(response.data.message || "Welcome back to Bookie System!", "Login Successful");
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("user", JSON.stringify(response.data.data));
+        setLocation("/dashboard");
+      } catch (err: any) {
+        handleApi(err);
+      } finally {
+        setIsLoading(false);
+      }
     },
   });
-
-  const handleLogin = async (data: LoginForm) => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Demo credentials check
-      if (data.username === "admin" && data.password === "admin123") {
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to Bookie System!",
-        });
-        
-        // Store login state (in a real app, you'd handle this properly)
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("userRole", "bookie");
-        localStorage.setItem("username", data.username);
-        
-        setLocation("/dashboard");
-      } else if (data.username === "assistant" && data.password === "assistant123") {
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to Bookie System!",
-        });
-        
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("userRole", "assistant");
-        localStorage.setItem("username", data.username);
-        
-        setLocation("/dashboard");
-      } else {
-        setError("Invalid username or password");
-      }
-    } catch (err) {
-      setError("Login failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4" data-testid="login-page">
@@ -113,66 +84,49 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive" data-testid="login-error">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+              <form onSubmit={formik.handleSubmit} className="space-y-4">
 
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your username"
-                          {...field}
-                          data-testid="username-input"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    {...formik.getFieldProps("email")}
+                    data-testid="email-input"
+                  />
+                  {formik.touched.email && formik.errors.email ? (
+                    <p className="text-sm text-destructive mt-1">{formik.errors.email}</p>
+                  ) : null}
+                </div>
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password"
-                            {...field}
-                            data-testid="password-input"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowPassword(!showPassword)}
-                            data-testid="toggle-password-button"
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      {...formik.getFieldProps("password")}
+                      data-testid="password-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="toggle-password-button"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {formik.touched.password && formik.errors.password ? (
+                    <p className="text-sm text-destructive mt-1">{formik.errors.password}</p>
+                  ) : null}
+                </div>
 
                 <Button
                   type="submit"
@@ -183,13 +137,11 @@ export default function Login() {
                   {isLoading ? "Signing In..." : "Sign In"}
                 </Button>
               </form>
-            </Form>
-
             {/* Demo Credentials */}
             <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border/50" data-testid="demo-credentials">
               <h4 className="font-medium text-sm mb-2">Demo Credentials:</h4>
               <div className="text-xs space-y-1 text-muted-foreground">
-                <div><strong>Bookie:</strong> admin / admin123</div>
+                <div><strong>Bookie:</strong> admin@mail.com / 123456</div>
                 <div><strong>Assistant:</strong> assistant / assistant123</div>
               </div>
             </div>

@@ -12,6 +12,8 @@ import {
   History,
   LogOut,
 } from "lucide-react";
+import { useError } from "@/hooks/useError";
+import { logout } from "@/utils/logout";
 
 const navigationItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -31,13 +33,17 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
+  const { success } = useError();
   
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("username");
-    setLocation("/");
+  const handleLogout = async () => {
+    // Show success message before logout
+    success("You have been logged out successfully!", "Logout");
+    
+    // Close sidebar
     onClose();
+    
+    // Perform logout (clears storage and redirects)
+    await logout();
   };
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +15,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import ProfileModal from "@/components/modals/profile-modal";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type Profile, type InsertProfile } from "@shared/schema";
+import axios from "@/config/axiosInstance";
+import { API } from "@/config/apiEndpoints";
 
 export default function Profiles() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,72 +27,57 @@ export default function Profiles() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
 
-  // Fetch profiles from API
-  const { data: profiles = [], isLoading } = useQuery<Profile[]>({
-    queryKey: ["/api/profiles"],
+  // Fetch profiles from API with pagination
+  const { data: profilesData, isLoading } = useQuery({
+    queryKey: ["profiles", currentPage, pageSize, searchTerm, typeFilter, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+      });
+
+      // Add search parameter if provided
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+
+      // Add type filter if not "all"
+      if (typeFilter !== "all") {
+        params.append('type', typeFilter);
+      }
+
+      // Add status filter if not "all"
+      if (statusFilter !== "all") {
+        params.append('status', statusFilter);
+      }
+
+      const response = await axios.get(`${API.PROFILE_INDEX}?${params.toString()}`);
+      return response.data;
+    },
   });
 
-  // Create profile mutation
-  const createProfileMutation = useMutation({
-    mutationFn: async (data: InsertProfile) => {
-      const response = await apiRequest("POST", "/api/profiles", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
-      toast({
-        title: "Success",
-        description: "Profile created successfully",
-      });
-      setIsModalOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create profile",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertProfile> }) => {
-      const response = await apiRequest("PUT", `/api/profiles/${id}`, data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      });
-      setIsModalOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile",
-        variant: "destructive",
-      });
-    },
-  });
+  const profiles = profilesData?.data || [];
+  const totalPages = Math.ceil((profilesData?.total || 0) / pageSize);
+  const totalItems = profilesData?.total || 0;
 
   // Delete profile mutation
   const deleteProfileMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/profiles/${id}`);
+      const response = await axios.delete(`${API.PROFILE_INDEX}/${id}`);
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["profiles"] });
       toast({
         title: "Success",
         description: "Profile deleted successfully",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to delete profile",
@@ -99,16 +86,6 @@ export default function Profiles() {
     },
   });
 
-  const filteredProfiles = profiles.filter(profile => {
-    const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         profile.phone.includes(searchTerm);
-    const matchesType = typeFilter === "all" || profile.type === typeFilter;
-    const matchesStatus = statusFilter === "all" || 
-                         (statusFilter === "active" && profile.isActive) ||
-                         (statusFilter === "inactive" && !profile.isActive);
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
 
   const handleAddProfile = () => {
     setSelectedProfile(null);
@@ -120,18 +97,46 @@ export default function Profiles() {
     setIsModalOpen(true);
   };
 
-  const handleSubmitProfile = (data: InsertProfile) => {
-    if (selectedProfile) {
-      updateProfileMutation.mutate({ id: selectedProfile.id, data });
-    } else {
-      createProfileMutation.mutate(data);
-    }
-  };
 
   const handleDeleteProfile = (profileId: string) => {
     if (confirm("Are you sure you want to delete this profile?")) {
       deleteProfileMutation.mutate(profileId);
     }
+  };
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize: string) => {
+    setPageSize(Number(newPageSize));
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Search handler with debounce
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Filter handlers
+  const handleTypeFilterChange = (value: string) => {
+    setTypeFilter(value);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setCurrentPage(1);
   };
 
   const columns = [
@@ -253,14 +258,14 @@ export default function Profiles() {
                   placeholder="Search profiles..."
                   className="pl-9"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   data-testid="profiles-search-input"
                 />
               </div>
             </div>
             <div>
               <Label htmlFor="type-filter">Type</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
                 <SelectTrigger className="mt-2" data-testid="profiles-type-filter">
                   <SelectValue />
                 </SelectTrigger>
@@ -273,7 +278,7 @@ export default function Profiles() {
             </div>
             <div>
               <Label htmlFor="status-filter">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="mt-2" data-testid="profiles-status-filter">
                   <SelectValue />
                 </SelectTrigger>
@@ -288,11 +293,7 @@ export default function Profiles() {
               <Button
                 variant="secondary"
                 className="w-full mt-2"
-                onClick={() => {
-                  setSearchTerm("");
-                  setTypeFilter("all");
-                  setStatusFilter("all");
-                }}
+                onClick={handleClearFilters}
                 data-testid="profiles-clear-filters-button"
               >
                 <Search className="w-4 h-4 mr-2" />
@@ -305,17 +306,86 @@ export default function Profiles() {
 
       {/* Profiles Table */}
       <DataTable
-        data={filteredProfiles}
+        data={profiles}
         columns={columns}
         testId="profiles-table"
         loading={isLoading}
       />
 
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="page-size">Show</Label>
+          <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+            <SelectTrigger className="w-20" data-testid="profiles-page-size">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <Label htmlFor="page-size">entries</Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+            data-testid="profiles-prev-page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Button>
+          
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+              if (pageNum > totalPages) return null;
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handlePageChange(pageNum)}
+                  className="w-8 h-8 p-0"
+                  data-testid={`profiles-page-${pageNum}`}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            data-testid="profiles-next-page"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} entries
+        </div>
+      </div>
+
       {/* Profile Modal */}
       <ProfileModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmitProfile}
+        onClose={() => {
+          setIsModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["profiles"] });
+        }}
         profile={selectedProfile}
       />
     </div>

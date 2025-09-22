@@ -1,0 +1,15 @@
+export const API = {
+  LOGIN: '/api/v1/user/login',
+  LOGOUT: '/api/v1/user/logout',
+  PROFILE: '/api/v1/user/profile',
+  USERS: '/api/v1/users',
+  PROFILES: '/api/v1/profiles',
+  PROFILE_INDEX: '/api/v1/profile/index',
+  PROFILE_CREATE: '/api/v1/profile/create',
+  TRANSACTIONS: '/api/v1/transactions',
+  TRANSACTION_TYPES: '/api/v1/transaction-type/all',
+  LEDGER: '/api/v1/ledger',
+  SETTLEMENTS: '/api/v1/settlements',
+  REPORTS: '/api/v1/reports',
+  AUDIT: '/api/v1/audit',
+} as const;

@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:9000';
 
 interface ApiResponse<T> {
   data: T;
@@ -51,16 +51,15 @@ class ApiClient {
     }
   }
 
-  async login(username: string, password: string): Promise<{ token: string; user: any } | null> {
+  async login(email: string, password: string): Promise<any | null> {
     try {
-      const response = await this.request<{ token: string; user: any }>('/auth/login', {
+      const response = await this.request<any>('/api/v1/user/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       
       if (response.success && response.data) {
-        await SecureStore.setItemAsync('auth_token', response.data.token);
-        await SecureStore.setItemAsync('user_data', JSON.stringify(response.data.user));
+        await SecureStore.setItemAsync('user_data', JSON.stringify(response.data));
         return response.data;
       }
       

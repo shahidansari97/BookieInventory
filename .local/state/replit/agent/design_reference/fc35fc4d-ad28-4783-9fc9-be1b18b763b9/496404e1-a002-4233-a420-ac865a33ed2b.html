@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookie Inventory Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                },
+                fontFamily: {
+                    sans: ["var(--font-sans)"],
+                }
+            },
+        }
+    };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --background: hsl(210 40% 98%);
+            --foreground: hsl(215 25% 15%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(215 25% 15%);
+            --popover: hsl(0 0% 100%);
+            --popover-foreground: hsl(215 25% 15%);
+            --primary: hsl(221 83% 53%);
+            --primary-foreground: hsl(0 0% 98%);
+            --secondary: hsl(210 40% 96%);
+            --secondary-foreground: hsl(215 25% 27%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215 20% 65%);
+            --accent: hsl(210 40% 96%);
+            --accent-foreground: hsl(215 25% 27%);
+            --destructive: hsl(0 84% 60%);
+            --destructive-foreground: hsl(0 0% 98%);
+            --border: hsl(214 32% 91%);
+            --input: hsl(214 32% 91%);
+            --ring: hsl(221 83% 53%);
+            --radius: 0.5rem;
+            --font-sans: 'Inter', sans-serif;
+        }
+        
+        body {
+            font-family: var(--font-sans);
+        }
+        
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+        
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+    <!-- Mobile Header -->
+    <div class="md:hidden bg-card border-b border-border p-4 flex items-center justify-between">
+        <h1 class="text-lg font-semibold">Bookie Inventory</h1>
+        <button onclick="toggleSidebar()" class="p-2 hover:bg-muted rounded-md">
+            <i class="fas fa-bars text-muted-foreground"></i>
+        </button>
+    </div>
+
+    <div class="flex">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar-hidden transition-transform duration-300 md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border shadow-lg md:shadow-none">
+            <div class="p-4 border-b border-border hidden md:block">
+                <h1 class="text-xl font-bold text-primary">Bookie System</h1>
+            </div>
+            
+            <nav class="p-4 space-y-2">
+                <a href="#" onclick="showSection('dashboard')" class="nav-link flex items-center space-x-3 p-3 rounded-lg bg-primary text-primary-foreground">
+                    <i class="fas fa-chart-dashboard w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" onclick="showSection('profiles')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Profiles</span>
+                </a>
+                <a href="#" onclick="showSection('transactions')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-exchange-alt w-5"></i>
+                    <span>Transactions</span>
+                </a>
+                <a href="#" onclick="showSection('ledger')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-calculator w-5"></i>
+                    <span>Ledger</span>
+                </a>
+                <a href="#" onclick="showSection('settlement')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-paper-plane w-5"></i>
+                    <span>Settlement</span>
+                </a>
+                <a href="#" onclick="showSection('reports')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-chart-bar w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="#" onclick="showSection('users')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-user-cog w-5"></i>
+                    <span>Users</span>
+                </a>
+                <a href="#" onclick="showSection('audit')" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-history w-5"></i>
+                    <span>Audit Trail</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 md:ml-0">
+            <!-- Dashboard Section -->
+            <div id="dashboard-section" class="section p-4 md:p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold mb-2">Dashboard</h2>
+                    <p class="text-muted-foreground">Overview of your inventory management system</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Total Inventory Purchased</p>
+                                <p class="text-2xl font-bold text-primary">₹12,45,000</p>
+                            </div>
+                            <div class="bg-primary/10 p-3 rounded-full">
+                                <i class="fas fa-arrow-down text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Total Inventory Distributed</p>
+                                <p class="text-2xl font-bold text-green-600">₹10,85,000</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-arrow-up text-green-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Outstanding Balance</p>
+                                <p class="text-2xl font-bold text-yellow-600">₹1,60,000</p>
+                            </div>
+                            <div class="bg-yellow-100 p-3 rounded-full">
+                                <i class="fas fa-clock text-yellow-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Net Profit</p>
+                                <p class="text-2xl font-bold text-green-600">₹85,500</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-chart-line text-green-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="bg-card rounded-lg border border-border p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">Recent Transactions</h3>
+                        <button onclick="showSection('transactions')" class="text-primary hover:underline text-sm">View All</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-border">
+                                    <th class="text-left py-2 text-sm font-medium text-muted-foreground">Date</th>
+                                    <th class="text-left py-2 text-sm font-medium text-muted-foreground">Type</th>
+                                    <th class="text-left py-2 text-sm font-medium text-muted-foreground">Profile</th>
+                                    <th class="text-right py-2 text-sm font-medium text-muted-foreground">Points</th>
+                                    <th class="text-right py-2 text-sm font-medium text-muted-foreground">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 text-sm">2024-01-15</td>
+                                    <td class="py-3">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            <i class="fas fa-arrow-down mr-1"></i>
+                                            Taken
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-sm">Super Exchange</td>
+                                    <td class="py-3 text-right text-sm">50,000</td>
+                                    <td class="py-3 text-right text-sm font-medium">₹75,000</td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 text-sm">2024-01-15</td>
+                                    <td class="py-3">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-arrow-up mr-1"></i>
+                                            Given
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-sm">Agent Kumar</td>
+                                    <td class="py-3 text-right text-sm">25,000</td>
+                                    <td class="py-3 text-right text-sm font-medium">₹39,375</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 text-sm">2024-01-14</td>
+                                    <td class="py-3">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-arrow-up mr-1"></i>
+                                            Given
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-sm">Agent Sharma</td>
+                                    <td class="py-3 text-right text-sm">15,000</td>
+                                    <td class="py-3 text-right text-sm font-medium">₹24,750</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profiles Section -->
+            <div id="profiles-section" class="section hidden p-4 md:p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Uplinks & Downlines</h2>
+                        <p class="text-muted-foreground">Manage your inventory partners</p>
+                    </div>
+                    <button onclick="showModal('profile-modal')" class="mt-4 md:mt-0 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Profile
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-card p-4 rounded-lg border border-border mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Search</label>
+                            <input type="text" placeholder="Search profiles..." class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Type</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Types</option>
+                                <option>Uplink</option>
+                                <option>Downline</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Status</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Status</option>
+                                <option>Active</option>
+                                <option>Inactive</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/80 transition-colors">
+                                <i class="fas fa-search mr-2"></i>
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profiles Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Name</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Type</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Contact</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Rate/Point</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Commission</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50 hover:bg-muted/50">
+                                    <td class="py-3 px-4">
+                                        <div class="font-medium">Super Exchange</div>
+                                        <div class="text-sm text-muted-foreground">Primary uplink</div>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            Uplink
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div>+91 9876543210</div>
+                                        <div class="text-sm text-muted-foreground">super@exchange.com</div>
+                                    </td>
+                                    <td class="py-3 px-4 text-right font-medium">₹1.50</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('profile-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50 hover:bg-muted/50">
+                                    <td class="py-3 px-4">
+                                        <div class="font-medium">Agent Kumar</div>
+                                        <div class="text-sm text-muted-foreground">Cricket specialist</div>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Downline
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div>+91 8765432109</div>
+                                        <div class="text-sm text-muted-foreground">kumar.agent@gmail.com</div>
+                                    </td>
+                                    <td class="py-3 px-4 text-right font-medium">₹1.65</td>
+                                    <td class="py-3 px-4 text-right">5%</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('profile-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="py-3 px-4">
+                                        <div class="font-medium">Agent Sharma</div>
+                                        <div class="text-sm text-muted-foreground">Multi-sport agent</div>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Downline
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div>+91 7654321098</div>
+                                        <div class="text-sm text-muted-foreground">sharma.bets@yahoo.com</div>
+                                    </td>
+                                    <td class="py-3 px-4 text-right font-medium">₹1.70</td>
+                                    <td class="py-3 px-4 text-right">8%</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('profile-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="px-4 py-3 bg-muted border-t border-border flex items-center justify-between">
+                        <div class="text-sm text-muted-foreground">
+                            Showing 1 to 3 of 3 entries
+                        </div>
+                        <div class="flex space-x-1">
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background disabled:opacity-50" disabled>
+                                Previous
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md">
+                                1
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background disabled:opacity-50" disabled>
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Section -->
+            <div id="transactions-section" class="section hidden p-4 md:p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Inventory Transactions</h2>
+                        <p class="text-muted-foreground">Track all inventory movements</p>
+                    </div>
+                    <button onclick="showModal('transaction-modal')" class="mt-4 md:mt-0 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Transaction
+                    </button>
+                </div>
+
+                <!-- Transaction Filters -->
+                <div class="bg-card p-4 rounded-lg border border-border mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date From</label>
+                            <input type="date" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date To</label>
+                            <input type="date" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Type</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Types</option>
+                                <option>Inventory Taken</option>
+                                <option>Inventory Given</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Profile</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Profiles</option>
+                                <option>Super Exchange</option>
+                                <option>Agent Kumar</option>
+                                <option>Agent Sharma</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/80 transition-colors">
+                                <i class="fas fa-filter mr-2"></i>
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Date</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Type</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Profile</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Points</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Rate</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Commission</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Total Amount</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50 hover:bg-muted/50">
+                                    <td class="py-3 px-4">2024-01-15</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            <i class="fas fa-arrow-down mr-1"></i>
+                                            Taken
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Super Exchange</td>
+                                    <td class="py-3 px-4 text-right font-medium">50,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.50</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹75,000</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('transaction-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50 hover:bg-muted/50">
+                                    <td class="py-3 px-4">2024-01-15</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-arrow-up mr-1"></i>
+                                            Given
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Agent Kumar</td>
+                                    <td class="py-3 px-4 text-right font-medium">25,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.65</td>
+                                    <td class="py-3 px-4 text-right">5%</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹43,125</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('transaction-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50 hover:bg-muted/50">
+                                    <td class="py-3 px-4">2024-01-14</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-arrow-up mr-1"></i>
+                                            Given
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Agent Sharma</td>
+                                    <td class="py-3 px-4 text-right font-medium">15,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.70</td>
+                                    <td class="py-3 px-4 text-right">8%</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹27,540</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('transaction-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="py-3 px-4">2024-01-13</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            <i class="fas fa-arrow-down mr-1"></i>
+                                            Taken
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Super Exchange</td>
+                                    <td class="py-3 px-4 text-right font-medium">100,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.50</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹1,50,000</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('transaction-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="px-4 py-3 bg-muted border-t border-border flex items-center justify-between">
+                        <div class="text-sm text-muted-foreground">
+                            Showing 1 to 4 of 24 entries
+                        </div>
+                        <div class="flex space-x-1">
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background disabled:opacity-50" disabled>
+                                Previous
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md">
+                                1
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                2
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                3
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Section -->
+            <div id="ledger-section" class="section hidden p-4 md:p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Automated Ledger</h2>
+                        <p class="text-muted-foreground">Balance calculations and profit/loss reports</p>
+                    </div>
+                    <button onclick="calculateLedger()" class="mt-4 md:mt-0 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-calculator mr-2"></i>
+                        Calculate Now
+                    </button>
+                </div>
+
+                <!-- Calculation Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <h3 class="text-lg font-semibold mb-4">Uplink Balances</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Super Exchange</span>
+                                <span class="font-medium text-destructive">₹2,25,000</span>
+                            </div>
+                            <div class="text-xs text-muted-foreground">
+                                Last calculated: 2024-01-15 09:00 AM
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <h3 class="text-lg font-semibold mb-4">Downline Balances</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Agent Kumar</span>
+                                <span class="font-medium text-green-600">+₹43,125</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Agent Sharma</span>
+                                <span class="font-medium text-green-600">+₹27,540</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <h3 class="text-lg font-semibold mb-4">Net Position</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Total Profit</span>
+                                <span class="font-medium text-2xl text-green-600">₹1,54,335</span>
+                            </div>
+                            <div class="text-xs text-muted-foreground">
+                                Week: Jan 8-14, 2024
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Ledger Table -->
+                <div class="bg-card rounded-lg border border-border">
+                    <div class="p-4 border-b border-border">
+                        <h3 class="text-lg font-semibold">Detailed Ledger Report</h3>
+                        <p class="text-sm text-muted-foreground">Week ending January 14, 2024</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Profile</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Type</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Total Points</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Average Rate</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Commission</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Balance</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">Super Exchange</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            Uplink
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-right">150,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.50</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4 text-right font-medium text-destructive">₹2,25,000 (Owe)</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-600">
+                                            Pending
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">Agent Kumar</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Downline
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-right">25,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.65</td>
+                                    <td class="py-3 px-4 text-right">5%</td>
+                                    <td class="py-3 px-4 text-right font-medium text-green-600">₹43,125 (Receive)</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-600">
+                                            Pending
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium">Agent Sharma</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Downline
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-right">15,000</td>
+                                    <td class="py-3 px-4 text-right">₹1.70</td>
+                                    <td class="py-3 px-4 text-right">8%</td>
+                                    <td class="py-3 px-4 text-right font-medium text-green-600">₹27,540 (Receive)</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-600">
+                                            Pending
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settlement Section -->
+            <div id="settlement-section" class="section hidden p-4 md:p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Settlement & WhatsApp</h2>
+                        <p class="text-muted-foreground">Automated settlement reports via WhatsApp</p>
+                    </div>
+                    <button onclick="showModal('settlement-modal')" class="mt-4 md:mt-0 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-paper-plane mr-2"></i>
+                        Send Settlement
+                    </button>
+                </div>
+
+                <!-- Settlement Status -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <h3 class="text-lg font-semibold mb-4">Next Settlement</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Scheduled Date:</span>
+                                <span class="font-medium">Monday, Jan 22, 2024</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Profiles to Settle:</span>
+                                <span class="font-medium">3 profiles</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Auto Send:</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                    Enabled
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <h3 class="text-lg font-semibold mb-4">WhatsApp Status</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">API Status:</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    Connected
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Messages Sent Today:</span>
+                                <span class="font-medium">12</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-muted-foreground">Failed Deliveries:</span>
+                                <span class="font-medium text-destructive">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settlement History -->
+                <div class="bg-card rounded-lg border border-border">
+                    <div class="p-4 border-b border-border">
+                        <h3 class="text-lg font-semibold">Settlement History</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Date</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Period</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Profile</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Amount</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Status</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4">2024-01-15</td>
+                                    <td class="py-3 px-4">Jan 8-14, 2024</td>
+                                    <td class="py-3 px-4">Super Exchange</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹2,25,000</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-check mr-1"></i>
+                                            Sent
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <button onclick="showModal('message-preview-modal')" class="text-primary hover:text-primary/80">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4">2024-01-15</td>
+                                    <td class="py-3 px-4">Jan 8-14, 2024</td>
+                                    <td class="py-3 px-4">Agent Kumar</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹43,125</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-check mr-1"></i>
+                                            Sent
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <button onclick="showModal('message-preview-modal')" class="text-primary hover:text-primary/80">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4">2024-01-15</td>
+                                    <td class="py-3 px-4">Jan 8-14, 2024</td>
+                                    <td class="py-3 px-4">Agent Sharma</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹27,540</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-600">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            Pending
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <button class="text-primary hover:text-primary/80">
+                                            <i class="fas fa-redo"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4">2024-01-08</td>
+                                    <td class="py-3 px-4">Jan 1-7, 2024</td>
+                                    <td class="py-3 px-4">Super Exchange</td>
+                                    <td class="py-3 px-4 text-right font-medium">₹1,85,000</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            <i class="fas fa-check mr-1"></i>
+                                            Sent
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <button onclick="showModal('message-preview-modal')" class="text-primary hover:text-primary/80">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Section -->
+            <div id="reports-section" class="section hidden p-4 md:p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold mb-2">Custom Reports</h2>
+                    <p class="text-muted-foreground">Generate detailed reports for any date range</p>
+                </div>
+
+                <!-- Report Filters -->
+                <div class="bg-card p-6 rounded-lg border border-border mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Generate Report</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Report Type</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>Profit/Loss Report</option>
+                                <option>Balance Summary</option>
+                                <option>Transaction Report</option>
+                                <option>Commission Analysis</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Start Date</label>
+                            <input type="date" value="2024-01-01" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">End Date</label>
+                            <input type="date" value="2024-01-15" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Generate
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sample Report -->
+                <div class="bg-card rounded-lg border border-border">
+                    <div class="p-4 border-b border-border flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold">Profit/Loss Report</h3>
+                            <p class="text-sm text-muted-foreground">January 1-15, 2024</p>
+                        </div>
+                        <div class="space-x-2">
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted">
+                                <i class="fas fa-download mr-1"></i>
+                                PDF
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted">
+                                <i class="fas fa-file-csv mr-1"></i>
+                                CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Report Summary -->
+                    <div class="p-6 border-b border-border">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-primary">₹3,75,000</div>
+                                <div class="text-sm text-muted-foreground">Total Revenue</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-destructive">₹2,25,000</div>
+                                <div class="text-sm text-muted-foreground">Total Costs</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-green-600">₹1,50,000</div>
+                                <div class="text-sm text-muted-foreground">Gross Profit</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-green-600">40%</div>
+                                <div class="text-sm text-muted-foreground">Profit Margin</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Breakdown -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Profile</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Type</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Volume</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Revenue</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Commission</th>
+                                    <th class="text-right py-3 px-4 text-sm font-medium">Net P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">Agent Kumar</td>
+                                    <td class="py-3 px-4">Downline</td>
+                                    <td class="py-3 px-4 text-right">75,000 pts</td>
+                                    <td class="py-3 px-4 text-right">₹1,23,750</td>
+                                    <td class="py-3 px-4 text-right">₹6,188</td>
+                                    <td class="py-3 px-4 text-right font-medium text-green-600">+₹11,250</td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">Agent Sharma</td>
+                                    <td class="py-3 px-4">Downline</td>
+                                    <td class="py-3 px-4 text-right">45,000 pts</td>
+                                    <td class="py-3 px-4 text-right">₹76,500</td>
+                                    <td class="py-3 px-4 text-right">₹6,120</td>
+                                    <td class="py-3 px-4 text-right font-medium text-green-600">+₹9,000</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium">Super Exchange</td>
+                                    <td class="py-3 px-4">Uplink</td>
+                                    <td class="py-3 px-4 text-right">250,000 pts</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4 text-right">-</td>
+                                    <td class="py-3 px-4 text-right font-medium text-destructive">-₹3,75,000</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Section -->
+            <div id="users-section" class="section hidden p-4 md:p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">User Management</h2>
+                        <p class="text-muted-foreground">Manage system users and permissions</p>
+                    </div>
+                    <button onclick="showModal('user-modal')" class="mt-4 md:mt-0 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-user-plus mr-2"></i>
+                        Add User
+                    </button>
+                </div>
+
+                <!-- Users Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Username</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Role</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Email</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Last Login</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Status</th>
+                                    <th class="text-center py-3 px-4 text-sm font-medium">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">admin</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                            Bookie
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">admin@bookie.com</td>
+                                    <td class="py-3 px-4">2024-01-15 09:30 AM</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Active
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('user-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 font-medium">assistant1</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/50 text-secondary-foreground">
+                                            Assistant
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">assistant@bookie.com</td>
+                                    <td class="py-3 px-4">2024-01-14 06:15 PM</td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            Active
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex justify-center space-x-2">
+                                            <button onclick="showModal('user-modal')" class="text-primary hover:text-primary/80">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="text-destructive hover:text-destructive/80">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Trail Section -->
+            <div id="audit-section" class="section hidden p-4 md:p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold mb-2">Audit Trail</h2>
+                    <p class="text-muted-foreground">Track all system activities and changes</p>
+                </div>
+
+                <!-- Audit Filters -->
+                <div class="bg-card p-4 rounded-lg border border-border mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date From</label>
+                            <input type="date" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date To</label>
+                            <input type="date" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Action</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Actions</option>
+                                <option>Create</option>
+                                <option>Update</option>
+                                <option>Delete</option>
+                                <option>Login</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">User</label>
+                            <select class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>All Users</option>
+                                <option>admin</option>
+                                <option>assistant1</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/80 transition-colors">
+                                <i class="fas fa-filter mr-2"></i>
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audit Log Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Timestamp</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">User</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Action</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Resource</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">Details</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium">IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 text-sm">2024-01-15 09:45:23</td>
+                                    <td class="py-3 px-4">admin</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                                            CREATE
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Transaction</td>
+                                    <td class="py-3 px-4 text-sm">Created transaction #T-2024-0115-001</td>
+                                    <td class="py-3 px-4 text-sm">192.168.1.100</td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 text-sm">2024-01-15 09:30:12</td>
+                                    <td class="py-3 px-4">admin</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-600">
+                                            LOGIN
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">System</td>
+                                    <td class="py-3 px-4 text-sm">User logged in successfully</td>
+                                    <td class="py-3 px-4 text-sm">192.168.1.100</td>
+                                </tr>
+                                <tr class="border-b border-border/50">
+                                    <td class="py-3 px-4 text-sm">2024-01-14 18:15:45</td>
+                                    <td class="py-3 px-4">assistant1</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-600">
+                                            UPDATE
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Profile</td>
+                                    <td class="py-3 px-4 text-sm">Updated Agent Kumar profile</td>
+                                    <td class="py-3 px-4 text-sm">192.168.1.101</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 text-sm">2024-01-14 17:30:22</td>
+                                    <td class="py-3 px-4">admin</td>
+                                    <td class="py-3 px-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
+                                            CALCULATE
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">Ledger</td>
+                                    <td class="py-3 px-4 text-sm">Triggered manual ledger calculation</td>
+                                    <td class="py-3 px-4 text-sm">192.168.1.100</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="px-4 py-3 bg-muted border-t border-border flex items-center justify-between">
+                        <div class="text-sm text-muted-foreground">
+                            Showing 1 to 4 of 156 entries
+                        </div>
+                        <div class="flex space-x-1">
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background disabled:opacity-50" disabled>
+                                Previous
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md">
+                                1
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                2
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                3
+                            </button>
+                            <button class="px-3 py-1 text-sm border border-border rounded-md hover:bg-background">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-card rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Add Profile</h3>
+                <button onclick="hideModal('profile-modal')" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Type <span class="text-destructive">*</span></label>
+                    <select required class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Select Type</option>
+                        <option value="uplink">Uplink</option>
+                        <option value="downline">Downline</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Name <span class="text-destructive">*</span></label>
+                    <input type="text" required placeholder="Enter profile name" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Phone Number <span class="text-destructive">*</span></label>
+                    <input type="tel" required placeholder="+91 9876543210" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Email</label>
+                    <input type="email" placeholder="email@example.com" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Rate per Point <span class="text-destructive">*</span></label>
+                    <input type="number" required step="0.01" placeholder="1.50" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div id="commission-field" class="hidden">
+                    <label class="block text-sm font-medium mb-2">Commission Percentage</label>
+                    <input type="number" step="0.01" min="0" max="100" placeholder="5.00" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Notes</label>
+                    <textarea rows="3" placeholder="Optional notes..." class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" onclick="hideModal('profile-modal')" class="flex-1 px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        Save Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div id="transaction-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-card rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Add Transaction</h3>
+                <button onclick="hideModal('transaction-modal')" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Transaction Type <span class="text-destructive">*</span></label>
+                    <select required class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Select Type</option>
+                        <option value="taken">Inventory Taken from Uplink</option>
+                        <option value="given">Inventory Given to Downline</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Profile <span class="text-destructive">*</span></label>
+                    <select required class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Select Profile</option>
+                        <option value="super-exchange">Super Exchange</option>
+                        <option value="agent-kumar">Agent Kumar</option>
+                        <option value="agent-sharma">Agent Sharma</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Date <span class="text-destructive">*</span></label>
+                    <input type="date" required class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Points <span class="text-destructive">*</span></label>
+                    <input type="number" required min="1" placeholder="10000" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Rate per Point <span class="text-destructive">*</span></label>
+                    <input type="number" required step="0.01" placeholder="1.50" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div id="transaction-commission-field" class="hidden">
+                    <label class="block text-sm font-medium mb-2">Commission Percentage</label>
+                    <input type="number" step="0.01" min="0" max="100" placeholder="5.00" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Notes</label>
+                    <textarea rows="3" placeholder="Optional notes..." class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
+                </div>
+                
+                <div class="bg-muted p-3 rounded-md">
+                    <div class="text-sm font-medium mb-1">Total Amount</div>
+                    <div class="text-xl font-bold text-primary">₹0.00</div>
+                    <div class="text-xs text-muted-foreground">Calculated automatically</div>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" onclick="hideModal('transaction-modal')" class="flex-1 px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        Save Transaction
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settlement Modal -->
+    <div id="settlement-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-card rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Send Settlement</h3>
+                <button onclick="hideModal('settlement-modal')" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Settlement Date</label>
+                    <input type="date" value="2024-01-15" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Profiles to Settle</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" checked class="rounded border-border text-primary focus:ring-ring">
+                            <span>Super Exchange (₹2,25,000)</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" checked class="rounded border-border text-primary focus:ring-ring">
+                            <span>Agent Kumar (₹43,125)</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" class="rounded border-border text-primary focus:ring-ring">
+                            <span>Agent Sharma (₹27,540)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Message Template</label>
+                    <textarea rows="4" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">Settlement Report for {period}
+
+Balance: {balance}
+Status: {status}
+
+Thank you for your business.
+- Bookie System</textarea>
+                </div>
+                
+                <div class="bg-muted p-3 rounded-md">
+                    <div class="text-sm font-medium mb-2">Settlement Summary</div>
+                    <div class="text-sm space-y-1">
+                        <div>Profiles: 2 selected</div>
+                        <div>Messages: 2 to send</div>
+                        <div>Period: Jan 8-14, 2024</div>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" onclick="hideModal('settlement-modal')" class="flex-1 px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" class="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-paper-plane mr-2"></i>
+                        Send Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Preview Modal -->
+    <div id="message-preview-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-card rounded-lg max-w-md w-full">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold">WhatsApp Message</h3>
+                <button onclick="hideModal('message-preview-modal')" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <div class="text-sm font-medium mb-2">Message sent to: +91 9876543210</div>
+                    <div class="text-sm bg-white p-3 rounded-md border">
+                        Settlement Report for Jan 8-14, 2024<br><br>
+                        Balance: ₹2,25,000<br>
+                        Status: Pending Payment<br><br>
+                        Thank you for your business.<br>
+                        - Bookie System
+                    </div>
+                </div>
+                
+                <div class="text-sm text-muted-foreground space-y-1">
+                    <div>Sent: Jan 15, 2024 09:00 AM</div>
+                    <div>Status: ✅ Delivered</div>
+                    <div>Read: Jan 15, 2024 09:05 AM</div>
+                </div>
+                
+                <div class="pt-4">
+                    <button onclick="hideModal('message-preview-modal')" class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div id="user-modal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-card rounded-lg max-w-md w-full">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Add User</h3>
+                <button onclick="hideModal('user-modal')" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Username <span class="text-destructive">*</span></label>
+                    <input type="text" required placeholder="Enter username" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Email <span class="text-destructive">*</span></label>
+                    <input type="email" required placeholder="user@example.com" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Password <span class="text-destructive">*</span></label>
+                    <input type="password" required placeholder="Min 8 characters" class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Role <span class="text-destructive">*</span></label>
+                    <select required class="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Select Role</option>
+                        <option value="bookie">Bookie (Full Access)</option>
+                        <option value="assistant">Assistant (Limited Access)</option>
+                    </select>
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" onclick="hideModal('user-modal')" class="flex-1 px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        Create User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // TODO: Implement business logic, API calls, or state management
+        
+        (function() {
+            // Navigation functionality
+            function showSection(sectionName) {
+                // Hide all sections
+                const sections = document.querySelectorAll('.section');
+                sections.forEach(section => section.classList.add('hidden'));
+                
+                // Show target section
+                const targetSection = document.getElementById(sectionName + '-section');
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                }
+                
+                // Update navigation active state
+                const navLinks = document.querySelectorAll('.nav-link');
+                navLinks.forEach(link => {
+                    link.classList.remove('bg-primary', 'text-primary-foreground');
+                    link.classList.add('hover:bg-muted', 'text-muted-foreground', 'hover:text-foreground');
+                });
+                
+                const activeLink = document.querySelector(`[onclick="showSection('${sectionName}')"]`);
+                if (activeLink) {
+                    activeLink.classList.add('bg-primary', 'text-primary-foreground');
+                    activeLink.classList.remove('hover:bg-muted', 'text-muted-foreground', 'hover:text-foreground');
+                }
+                
+                // Close sidebar on mobile
+                closeSidebar();
+            }
+            
+            // Modal functionality
+            function showModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+            }
+            
+            function hideModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            }
+            
+            // Sidebar functionality
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('sidebar-hidden');
+            }
+            
+            function closeSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                if (window.innerWidth < 768) {
+                    sidebar.classList.add('sidebar-hidden');
+                }
+            }
+            
+            // Ledger calculation
+            function calculateLedger() {
+                // Simulate calculation process
+                alert('Ledger calculation completed successfully!');
+            }
+            
+            // Make functions globally available
+            window.showSection = showSection;
+            window.showModal = showModal;
+            window.hideModal = hideModal;
+            window.toggleSidebar = toggleSidebar;
+            window.calculateLedger = calculateLedger;
+            
+            // Close modal when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('modal')) {
+                    e.target.classList.add('hidden');
+                    e.target.classList.remove('flex');
+                }
+            });
+            
+            // Form handling for profile type change
+            document.addEventListener('change', function(e) {
+                if (e.target.closest('#profile-modal select')) {
+                    const commissionField = document.getElementById('commission-field');
+                    if (e.target.value === 'downline') {
+                        commissionField.classList.remove('hidden');
+                    } else {
+                        commissionField.classList.add('hidden');
+                    }
+                }
+                
+                if (e.target.closest('#transaction-modal select')) {
+                    const commissionField = document.getElementById('transaction-commission-field');
+                    if (e.target.value === 'given') {
+                        commissionField.classList.remove('hidden');
+                    } else {
+                        commissionField.classList.add('hidden');
+                    }
+                }
+            });
+            
+            // Close sidebar when window resizes
+            window.addEventListener('resize', function() {
+                if (window.innerWidth >= 768) {
+                    const sidebar = document.getElementById('sidebar');
+                    sidebar.classList.remove('sidebar-hidden');
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

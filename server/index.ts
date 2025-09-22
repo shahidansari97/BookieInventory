@@ -1,6 +1,10 @@
+import dotenv from "dotenv";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+// Load .env into process.env
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -60,12 +64,23 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+
+
+  // const host = "127.0.0.1"; // instead of 0.0.0.0
+  // const port = parseInt(process.env.PORT || '2000', 10);
+  // server.listen({
+  //   port,
+  //   host: host,
+  //   reusePort: true,
+  // }, () => {
+  //   console.log(`🚀 Server running on http://localhost:${port}`);
+  // });
+
+  const PORT = process.env.PORT || 2000; // instead of 5000
+  const BASE_URL = process.env.BASE_URL || "http://localhost"; // instead of 5000
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on ${BASE_URL}:${PORT}`);
   });
+
+
 })();
