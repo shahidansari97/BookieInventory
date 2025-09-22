@@ -9,125 +9,386 @@ import StatCard from "@/components/cards/stat-card";
 import DataTable from "@/components/tables/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction, type Profile } from "@shared/schema";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import axios from "@/config/axiosInstance";
+import { API } from "@/config/apiEndpoints";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
-  // Fetch real data from APIs
+  // Safe data fetching with error handling
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const { data: profiles = [], isLoading: profilesLoading } = useQuery<Profile[]>({
     queryKey: ["/api/profiles"],
+    retry: 1,
+    retryDelay: 1000,
   });
 
-  // Calculate real stats from actual data
+  // Fetch uplink profiles for dropdown with error handling
+  const { data: uplinkProfiles = [], error: uplinkProfilesError } = useQuery<any[]>({
+    queryKey: ["uplink-profiles-all"],
+    queryFn: async () => {
+      try {
+        console.log('Fetching uplink profiles...');
+        const response = await axios.get(API.UPLINK_PROFILES_ALL);
+        console.log('Uplink profiles response:', response.data);
+        
+        const payload = response.data;
+        const arr = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
+        return arr;
+      } catch (error: any) {
+        console.error('Uplink profiles API error:', error);
+        return [];
+      }
+    },
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  // Safe array normalization
+  const uplinkProfilesArray: any[] = Array.isArray(uplinkProfiles) ? uplinkProfiles : [];
+
+  // Select first uplink profile by default when list loads
+  useEffect(() => {
+    try {
+      if (!selectedProfileId && uplinkProfilesArray.length > 0) {
+        const firstProfile = uplinkProfilesArray[0];
+        if (firstProfile && firstProfile.id) {
+          console.log('Setting default profile:', firstProfile.id);
+          setSelectedProfileId(firstProfile.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error setting default profile:', error);
+    }
+  }, [uplinkProfilesArray, selectedProfileId]);
+
+  // Safe profile selection
+  const selectedProfile = uplinkProfilesArray.find(p => p && p.id === selectedProfileId);
+  const selectedProfileName = selectedProfile?.name || (uplinkProfilesArray.length === 0 ? "Loading..." : "No Profile Selected");
+  
+  // Safe effective profile ID
+  const effectiveSelectedProfileId = selectedProfileId || (uplinkProfilesArray.length > 0 ? uplinkProfilesArray[0]?.id : null);
+
+  // Fetch dashboard data with error handling
+  const { data: profileDashboard, isLoading: profileDashboardLoading, error: profileDashboardError } = useQuery<any | null>({
+    queryKey: ["dashboard-index", effectiveSelectedProfileId],
+    queryFn: async () => {
+      try {
+        if (!effectiveSelectedProfileId) {
+          return null;
+        }
+        
+        console.log('Fetching dashboard for profileId:', effectiveSelectedProfileId);
+        const response = await axios.post(API.DASHBOARD_INDEX, { profileId: effectiveSelectedProfileId });
+        console.log('Dashboard API response:', response.data);
+        
+        if (response.data?.success && response.data?.data) {
+          return response.data.data;
+        }
+        return null;
+      } catch (error: any) {
+        console.error('Dashboard API error:', error);
+        return null;
+      }
+    },
+    enabled: !!effectiveSelectedProfileId,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  // Safe stats calculation
   const stats = useMemo(() => {
-    // Always calculate profile counts even if no transactions
-    const uplinksCount = profiles.filter(p => p.type === "uplink").length;
-    const downlinesCount = profiles.filter(p => p.type === "downline").length;
-    
-    // Transaction stats only calculated if transactions exist
-    const totalTransactions = transactions.length;
-    const totalAmount = transactions.reduce((sum, t) => sum + parseFloat(t.totalAmount), 0);
-    
-    // Get recent transactions (last 3) 
-    const sortedTransactions = [...transactions].sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateB.getTime() - dateA.getTime();
-    });
-    const recentTransactions = sortedTransactions.slice(0, 3);
+    try {
+      if (profileDashboard && typeof profileDashboard === 'object') {
+        const latest = Array.isArray(profileDashboard.latestTransactions) ? profileDashboard.latestTransactions : [];
+        
+        return {
+          totalTransactions: latest.length,
+          totalAmount: (Number(profileDashboard.totalTakenAmount) || 0) + (Number(profileDashboard.totalGivenAmount) || 0),
+          uplinksCount: 0,
+          downlinesCount: 0,
+          recentTransactions: latest,
+          outstandingBalance: Number(profileDashboard.outstandingBalance) || 0,
+          totalTakenAmount: Number(profileDashboard.totalTakenAmount) || 0,
+          totalGivenAmount: Number(profileDashboard.totalGivenAmount) || 0,
+        };
+      }
 
+      const uplinksCount = Array.isArray(profiles) ? profiles.filter(p => p?.type === "uplink").length : 0;
+      const downlinesCount = Array.isArray(profiles) ? profiles.filter(p => p?.type === "downline").length : 0;
+      const totalTransactions = Array.isArray(transactions) ? transactions.length : 0;
+      const totalAmount = Array.isArray(transactions) ? transactions.reduce((sum, t) => sum + (Number(t?.totalAmount) || 0), 0) : 0;
+      
+      const sortedTransactions = Array.isArray(transactions) ? [...transactions].sort((a, b) => {
+        try {
+          return new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime();
+        } catch {
+          return 0;
+        }
+      }) : [];
+      const recentTransactions = sortedTransactions.slice(0, 3);
 
-    return {
-      totalTransactions,
-      totalAmount,
-      uplinksCount,
-      downlinesCount,
-      recentTransactions
-    };
-  }, [transactions, profiles]);
+      return {
+        totalTransactions,
+        totalAmount,
+        uplinksCount,
+        downlinesCount,
+        recentTransactions,
+        outstandingBalance: 0,
+        totalTakenAmount: 0,
+        totalGivenAmount: 0,
+      };
+    } catch (error) {
+      console.error('Error calculating stats:', error);
+      return {
+        totalTransactions: 0,
+        totalAmount: 0,
+        uplinksCount: 0,
+        downlinesCount: 0,
+        recentTransactions: [],
+        outstandingBalance: 0,
+        totalTakenAmount: 0,
+        totalGivenAmount: 0,
+      };
+    }
+  }, [transactions, profiles, profileDashboard]);
 
+  // Safe date formatting
+  const formatDate = (dateString: string) => {
+    try {
+      if (!dateString) return "-";
+      
+      const iso = new Date(dateString);
+      if (!isNaN(iso.getTime())) {
+        return iso.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "numeric",
+          year: "numeric",
+        });
+      }
+      
+      const short = dateString.match(/^(\d{2})-(\d{2})-(\d{2})$/);
+      if (short) {
+        const dd = Number(short[1]);
+        const mm = Number(short[2]);
+        const yy = 2000 + Number(short[3]);
+        return new Date(yy, mm - 1, dd).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "numeric",
+          year: "numeric",
+        });
+      }
+      
+      const long = dateString.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      if (long) {
+        const dd = Number(long[1]);
+        const mm = Number(long[2]);
+        const yyyy = Number(long[3]);
+        return new Date(yyyy, mm - 1, dd).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "numeric",
+          year: "numeric",
+        });
+      }
+      
+      return "-";
+    } catch {
+      return "-";
+    }
+  };
+
+  // Safe column definitions
   const columns = [
     {
       key: "date",
       title: "Date",
-      render: (value: Date | string) => {
-        const date = value instanceof Date ? value : new Date(value);
-        return date.toLocaleDateString("en-IN");
+      render: (value: any) => {
+        try {
+          const str = value instanceof Date ? value.toISOString() : String(value || "");
+          return formatDate(str);
+        } catch {
+          return "-";
+        }
       },
     },
     {
-      key: "type",
+      key: "transactionType",
       title: "Type",
-      render: (value: string) => (
-        <Badge 
-          variant={value === "taken" ? "default" : "secondary"}
-          className={
-            value === "taken" 
-              ? "bg-primary/10 text-primary" 
-              : "bg-green-100 text-green-600"
-          }
-        >
-          {value === "taken" ? (
-            <>
-              <TrendingDown className="w-3 h-3 mr-1" />
-              Taken
-            </>
-          ) : (
-            <>
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Given
-            </>
-          )}
-        </Badge>
-      ),
-    },
-    {
-      key: "profileId",
-      title: "Profile",
       render: (value: string) => {
-        const profile = profiles.find(p => p.id === value);
-        return profile?.name || "Unknown";
+        try {
+          return (
+            <Badge 
+              variant={value === "UPLINK" ? "default" : "secondary"}
+              className={
+                value === "UPLINK" 
+                  ? "bg-primary/10 text-primary" 
+                  : "bg-green-100 text-green-600"
+              }
+            >
+              {value === "UPLINK" ? (
+                <>
+                  <TrendingDown className="w-3 h-3 mr-1" />
+                  Taken
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  Given
+                </>
+              )}
+            </Badge>
+          );
+        } catch {
+          return <span>-</span>;
+        }
       },
     },
     {
-      key: "points",
-      title: "Points",
+      key: "profileInfo",
+      title: "Profile",
+      render: (value: any) => {
+        try {
+          return value?.name || "Unknown";
+        } catch {
+          return "Unknown";
+        }
+      },
+    },
+    {
+      key: "amount",
+      title: "Amount",
       align: "right" as const,
-      render: (value: number) => value.toLocaleString("en-IN"),
+      render: (value: number) => {
+        try {
+          return (value || 0).toLocaleString("en-IN");
+        } catch {
+          return "0";
+        }
+      },
     },
     {
       key: "totalAmount",
-      title: "Amount",
+      title: "Total",
       align: "right" as const,
-      render: (value: string) => `₹${parseFloat(value).toLocaleString("en-IN")}`,
+      render: (value: number) => {
+        try {
+          return `₹${(value || 0).toLocaleString("en-IN")}`;
+        } catch {
+          return "₹0";
+        }
+      },
     },
   ];
 
+  // Safe click handlers
+  const handleViewAllClick = () => {
+    try {
+      console.log('View All button clicked - navigating to /transactions');
+      setLocation("/transactions");
+    } catch (error) {
+      console.error('Error navigating to transactions:', error);
+    }
+  };
+
+  const handleProfileSelect = (profileId: string) => {
+    try {
+      if (profileId) {
+        setSelectedProfileId(profileId);
+      }
+    } catch (error) {
+      console.error('Error selecting profile:', error);
+    }
+  };
+
+  // Show error if uplink profiles fail to load
+  if (uplinkProfilesError) {
+    return (
+      <div className="p-4 md:p-6" data-testid="dashboard-page">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2 text-destructive">Error Loading Profiles</h2>
+          <p className="text-muted-foreground mb-4">
+            Failed to load uplink profiles. Please check the console for details.
+          </p>
+          <Button onClick={() => window.location.reload()}>
+            Refresh Page
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6" data-testid="dashboard-page">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2" data-testid="dashboard-title">
-          Dashboard
-        </h2>
-        <p className="text-muted-foreground" data-testid="dashboard-description">
-          Overview of your inventory management system
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold mb-2" data-testid="dashboard-title">
+            Dashboard
+          </h2>
+          <p className="text-muted-foreground" data-testid="dashboard-description">
+            Overview of your inventory management system
+          </p>
+        </div>
+        {/* Exchange user list dropdown */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Selected Profile:</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                {selectedProfileName}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {/* Dynamic Uplink profiles */}
+              {uplinkProfilesArray.length > 0 ? (
+                uplinkProfilesArray.map((p: any) => {
+                  if (!p || typeof p !== 'object' || !p.id) return null;
+                  return (
+                    <DropdownMenuItem 
+                      key={p.id} 
+                      onClick={() => handleProfileSelect(p.id)}
+                      className={selectedProfileId === p.id ? "bg-blue-50 font-semibold" : ""}
+                    >
+                      {p.name || 'Unknown Profile'}
+                      {selectedProfileId === p.id && (
+                        <span className="ml-auto text-blue-600">✓</span>
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })
+              ) : (
+                <DropdownMenuItem disabled>No Uplink Profiles</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           title="Total Transactions"
-          value={transactionsLoading ? "..." : stats.totalTransactions.toString()}
+          value={profileDashboardLoading ? "..." : String(stats.totalTransactions)}
           icon={Clock}
           iconColor="text-primary"
           iconBgColor="bg-primary/10"
@@ -135,23 +396,23 @@ export default function Dashboard() {
         />
         <StatCard
           title="Total Amount"
-          value={transactionsLoading ? "..." : `₹${stats.totalAmount.toLocaleString("en-IN")}`}
+          value={profileDashboardLoading ? "..." : `₹${stats.totalAmount.toLocaleString("en-IN")}`}
           icon={TrendingUpIcon}
           iconColor="text-green-600"
           iconBgColor="bg-green-100"
           valueColor="text-green-600"
         />
         <StatCard
-          title="Active Uplinks"
-          value={profilesLoading ? "..." : stats.uplinksCount.toString()}
+          title="Taken Amount"
+          value={profileDashboardLoading ? "..." : `₹${stats.totalTakenAmount.toLocaleString("en-IN")}`}
           icon={TrendingUp}
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
           valueColor="text-blue-600"
         />
         <StatCard
-          title="Active Downlines"
-          value={profilesLoading ? "..." : stats.downlinesCount.toString()}
+          title="Outstanding Balance"
+          value={profileDashboardLoading ? "..." : `₹${stats.outstandingBalance.toLocaleString("en-IN")}`}
           icon={TrendingDown}
           iconColor="text-purple-600"
           iconBgColor="bg-purple-100"
@@ -167,22 +428,45 @@ export default function Dashboard() {
               Recent Transactions
             </CardTitle>
             <Button
-              variant="link"
-              onClick={() => setLocation("/transactions")}
+              variant="outline"
+              onClick={handleViewAllClick}
               data-testid="view-all-transactions-button"
+              className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300"
             >
-              <Eye className="w-4 h-4 mr-1" />
+              <Eye className="w-4 h-4" />
               View All
             </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable
-            data={stats.recentTransactions}
-            columns={columns}
-            itemsPerPage={10}
-            testId="recent-transactions-table"
-          />
+          {profileDashboardLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <p className="text-muted-foreground">Loading profile data...</p>
+              </div>
+            </div>
+          ) : profileDashboardError ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <p className="text-destructive text-lg mb-2">Error loading profile data</p>
+                <p className="text-sm text-muted-foreground">Please try selecting another profile</p>
+              </div>
+            </div>
+          ) : stats.recentTransactions.length === 0 ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <p className="text-muted-foreground text-lg mb-2">No transactions found</p>
+                <p className="text-sm text-muted-foreground">This profile has no recent transactions</p>
+              </div>
+            </div>
+          ) : (
+            <DataTable
+              data={stats.recentTransactions}
+              columns={columns}
+              itemsPerPage={10}
+              testId="recent-transactions-table"
+            />
+          )}
         </CardContent>
       </Card>
     </div>
