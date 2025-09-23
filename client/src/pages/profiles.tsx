@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { type Profile, type InsertProfile } from "@shared/schema";
 import axios from "@/config/axiosInstance";
 import { API } from "@/config/apiEndpoints";
+import { formatCurrency } from "@/config/currency";
 
 export default function Profiles() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,6 +32,12 @@ export default function Profiles() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
+
+  // Profile transactions panel state
+  const [txProfileId, setTxProfileId] = useState<string | null>(null);
+  const [txProfileName, setTxProfileName] = useState<string>("");
+  const [txPage, setTxPage] = useState(1);
+  const [txPageSize, setTxPageSize] = useState(5);
 
   // Debounce search term
   useEffect(() => {
@@ -104,6 +111,22 @@ export default function Profiles() {
   const profiles = profilesData?.data || [];
   const totalPages = profilesData?.totalPages || 1;
   const totalItems = profilesData?.totalItems || 0;
+
+  // Fetch transactions for selected profile (if any)
+  const { data: txData } = useQuery({
+    queryKey: ["profile-transactions", txProfileId, txPage, txPageSize],
+    queryFn: async () => {
+      if (!txProfileId) return null;
+      const params = new URLSearchParams({
+        page: txPage.toString(),
+        limit: txPageSize.toString(),
+        profileId: txProfileId,
+      });
+      const res = await axios.get(`${API.TRANSACTION_INDEX}?${params.toString()}`);
+      return res.data;
+    },
+    enabled: !!txProfileId,
+  });
 
   // Delete profile mutation
   const deleteProfileMutation = useMutation({
@@ -285,6 +308,19 @@ export default function Profiles() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => {
+              setTxProfileId(row.id);
+              setTxProfileName(row.name || "");
+              setTxPage(1);
+            }}
+            title="View Transactions"
+            data-testid={`view-transactions-${row.id}`}
+          >
+            <Eye className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => handleDeleteProfile(row.id)}
             data-testid={`delete-profile-${row.id}`}
           >
@@ -410,6 +446,99 @@ export default function Profiles() {
           testId="profiles-table"
           loading={isLoading}
         />
+      )}
+
+      {/* Profile Transactions Panel */}
+      {txProfileId && (
+        <Card className="mt-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Transactions for</div>
+                <div className="text-lg font-semibold">{txProfileName}</div>
+              </div>
+              <div>
+                <Button variant="outline" size="sm" onClick={() => setTxProfileId(null)}>Close</Button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Date</th>
+                    <th className="text-left py-2">Type</th>
+                    <th className="text-left py-2">Amount</th>
+                    <th className="text-left py-2">Rate</th>
+                    <th className="text-left py-2">Total</th>
+                    <th className="text-left py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!txData?.data || txData.data.length === 0 ? (
+                    <tr>
+                      <td className="py-6 text-center text-muted-foreground" colSpan={6}>No transactions found</td>
+                    </tr>
+                  ) : (
+                    txData.data.map((t: any) => (
+                      <tr key={t.id} className="border-b">
+                        <td className="py-2">{t.date}</td>
+                        <td className="py-2">
+                          <Badge variant={t.transactionType === 'UPLINK' ? 'default' : 'secondary'} className={t.transactionType === 'UPLINK' ? 'bg-primary/10 text-primary' : 'bg-green-100 text-green-600'}>
+                            {t.transactionType === 'UPLINK' ? 'Taken' : 'Given'}
+                          </Badge>
+                        </td>
+                        <td className="py-2">{formatCurrency(t.amount)}</td>
+                        <td className="py-2">{formatCurrency(t.ratePerPoint)}</td>
+                        <td className="py-2">{formatCurrency(t.totalAmount ?? (t.amount || 0))}</td>
+                        <td className="py-2">{t.status ? 'Active' : 'Inactive'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination for profile transactions */}
+            {txData && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">Show</span>
+                  <select
+                    className="border rounded px-2 py-1 text-sm"
+                    value={txPageSize}
+                    onChange={(e) => { setTxPageSize(Number(e.target.value)); setTxPage(1); }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                  </select>
+                  <span className="text-sm">entries</span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => setTxPage(txPage - 1)} disabled={txPage <= 1}>Previous</Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, txData.totalPages || 1) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min((txData.totalPages || 1) - 4, txPage - 2)) + i;
+                      if (pageNum > (txData.totalPages || 1)) return null;
+                      return (
+                        <Button key={pageNum} variant={txPage === pageNum ? 'default' : 'outline'} size="sm" className="w-8 h-8 p-0" onClick={() => setTxPage(pageNum)}>
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setTxPage(txPage + 1)} disabled={txPage >= (txData.totalPages || 1)}>Next</Button>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  {`Showing ${((txPage - 1) * txPageSize) + 1} to ${Math.min(txPage * txPageSize, txData?.totalItems || 0)} of ${txData?.totalItems || 0} entries`}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Pagination Controls - Only show when there are results */}

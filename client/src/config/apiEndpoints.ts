@@ -18,6 +18,7 @@ export const API = {
   TRANSACTIONS: '/api/v1/transactions',
   TRANSACTION_TYPES: '/api/v1/transaction-type/all',
   LEDGER: '/api/v1/ledger',
+  LEDGER_INDEX: '/api/v1/ledger/index',
   SETTLEMENTS: '/api/v1/settlements',
   REPORTS: '/api/v1/reports',
   AUDIT: '/api/v1/audit',

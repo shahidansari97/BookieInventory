@@ -424,7 +424,16 @@ export default function Transactions() {
                           {transaction.transactionType === 'UPLINK' ? 'Taken' : 'Given'}
                         </span>
                       </TableCell>
-                      <TableCell>{transaction.profileInfo?.name || transaction.profileName || '-'}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {transaction.profileInfo?.name || transaction.profileName || '-'}
+                          </div>
+                          {typeof (transaction as any)?.profileInfo?.email === 'string' && (
+                            <div className="text-xs text-muted-foreground">{(transaction as any).profileInfo.email}</div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono">
                         {transaction.amount.toLocaleString()}
                       </TableCell>
