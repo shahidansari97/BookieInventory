@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,18 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { success } = useError();
+  const [userInfo, setUserInfo] = useState<any | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        setUserInfo(JSON.parse(stored));
+      }
+    } catch {
+      setUserInfo(null);
+    }
+  }, []);
   
   const handleLogout = async () => {
     // Show success message before logout
@@ -72,7 +85,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         
         <nav className="p-4 space-y-2 flex flex-col h-full">
-          {navigationItems.map((item) => {
+          {navigationItems
+            .filter((item) => {
+              // Only show Users menu for role = 1 (admin)
+              if (item.path === "/users") {
+                return userInfo?.role === 1 || userInfo?.role === "1";
+              }
+              return true;
+            })
+            .map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
             
@@ -97,6 +118,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           
           {/* Logout Button */}
           <div className="mt-auto pt-4 border-t border-border">
+            {userInfo && (
+              <div className="px-3 pb-3 text-sm text-muted-foreground">
+                <div className="font-medium text-foreground truncate" data-testid="sidebar-user-name">
+                  {userInfo.name || userInfo.fullName || userInfo.username || userInfo.profile?.name || "User"}
+                </div>
+                {userInfo.email && (
+                  <div className="truncate" data-testid="sidebar-user-email">{userInfo.email}</div>
+                )}
+              </div>
+            )}
             <Button
               variant="ghost"
               onClick={handleLogout}

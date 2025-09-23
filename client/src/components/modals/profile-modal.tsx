@@ -243,15 +243,21 @@ export default function ProfileModal({
             <Label htmlFor="countryCode">
               Country Code <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="countryCode"
-              name="countryCode"
-              placeholder="+91"
+            <Select 
               value={formik.values.countryCode}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              data-testid="profile-country-code-input"
-            />
+              onValueChange={(value) => formik.setFieldValue('countryCode', value)}
+            >
+              <SelectTrigger data-testid="profile-country-code-input" className={formik.touched.countryCode && formik.errors.countryCode ? "border-red-500" : ""}>
+                <SelectValue placeholder="Select country code" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="+91">+91 (India)</SelectItem>
+                <SelectItem value="+1">+1 (USA)</SelectItem>
+                <SelectItem value="+44">+44 (UK)</SelectItem>
+                <SelectItem value="+61">+61 (Australia)</SelectItem>
+                <SelectItem value="+971">+971 (UAE)</SelectItem>
+              </SelectContent>
+            </Select>
             {formik.touched.countryCode && formik.errors.countryCode && (
               <p className="text-sm text-destructive">{formik.errors.countryCode}</p>
             )}

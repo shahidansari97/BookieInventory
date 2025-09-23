@@ -396,13 +396,6 @@ export default function Transactions() {
             <div className="flex items-center justify-center p-12">
               <div className="text-center">
                 <p className="text-muted-foreground text-lg mb-6">No transactions found</p>
-                <Button 
-                  onClick={() => handleOpenModal()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Transaction
-                </Button>
               </div>
             </div>
           ) : (

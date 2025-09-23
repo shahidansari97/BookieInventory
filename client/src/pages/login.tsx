@@ -32,15 +32,12 @@ export default function Login() {
     validationSchema: loginValidationSchema,
     onSubmit: async (values: LoginForm) => {
       setIsLoading(true);
-
       try {
         const response = await axios.post(API.LOGIN, values);
-
         if (response.data.success === false) {
-          handleApi(new Error(response.data.message || 'Login failed.'));
+          handleApi({ response: { status: 422, data: { message: response.data.message || 'Login failed.' } } });
           return;
         }
-
         success(response.data.message || "Welcome back to Bookie System!", "Login Successful");
         localStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("user", JSON.stringify(response.data.data));

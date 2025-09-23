@@ -79,7 +79,7 @@ export default function UserModal({
   onClose,
   user,
 }: UserModalProps) {
-  const { handleApi, success } = useError();
+  const { handleApi, success, handle } = useError();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!user;
 
@@ -119,11 +119,13 @@ export default function UserModal({
         }
         
         if (response.data.success) {
-          success(isEditing ? "User updated successfully!" : "User created successfully!");
+          const action = isEditing ? 'updated' : 'created';
+          success(response.data.message || `User ${action} successfully!`);
           onClose();
           formik.resetForm();
         } else {
-          handleApi(response.data.message || `Failed to ${isEditing ? 'update' : 'create'} user`);
+          // Backend returns success=false with 200; surface its message using API-style error
+          handleApi({ response: { status: 422, data: { message: response.data.message } } });
         }
       } catch (error: any) {
         console.error('User operation error:', error);
