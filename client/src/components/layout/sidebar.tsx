@@ -12,6 +12,7 @@ import {
   UserCog,
   History,
   LogOut,
+  ListChecks,
 } from "lucide-react";
 import { useError } from "@/hooks/useError";
 import { logout } from "@/utils/logout";
@@ -20,6 +21,7 @@ const navigationItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/profiles", label: "Profiles", icon: Users },
   { path: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { path: "/transaction-types", label: "Transaction Types", icon: ListChecks },
   { path: "/ledger", label: "Ledger", icon: Calculator },
   { path: "/settlement", label: "Settlement", icon: Send },
   { path: "/reports", label: "Reports", icon: BarChart3 },
@@ -87,8 +89,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav className="p-4 space-y-2 flex flex-col h-full">
           {navigationItems
             .filter((item) => {
-              // Only show Users menu for role = 1 (admin)
-              if (item.path === "/users") {
+              // Only show Users and Transaction Types menu for role = 1 (admin)
+              if (item.path === "/users" || item.path === "/transaction-types") {
                 return userInfo?.role === 1 || userInfo?.role === "1";
               }
               return true;

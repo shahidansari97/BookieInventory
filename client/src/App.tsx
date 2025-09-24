@@ -16,6 +16,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Profiles from "@/pages/profiles";
 import Transactions from "@/pages/transactions";
+import TransactionTypesPage from "@/pages/transaction-types";
 import Ledger from "@/pages/ledger";
 import Settlement from "@/pages/settlement";
 import Reports from "@/pages/reports";
@@ -65,6 +66,7 @@ function AuthenticatedApp() {
             <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
             <Route path="/profiles" component={() => <ProtectedRoute component={Profiles} />} />
             <Route path="/transactions" component={() => <ProtectedRoute component={Transactions} />} />
+            <Route path="/transaction-types" component={() => <ProtectedRoute component={TransactionTypesPage} />} />
             <Route path="/ledger" component={() => <ProtectedRoute component={Ledger} />} />
             <Route path="/settlement" component={() => <ProtectedRoute component={Settlement} />} />
             <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
@@ -86,6 +88,7 @@ function Router() {
       <Route path="/dashboard" component={AuthenticatedApp} />
       <Route path="/profiles" component={AuthenticatedApp} />
       <Route path="/transactions" component={AuthenticatedApp} />
+      <Route path="/transaction-types" component={AuthenticatedApp} />
       <Route path="/ledger" component={AuthenticatedApp} />
       <Route path="/settlement" component={AuthenticatedApp} />
       <Route path="/reports" component={AuthenticatedApp} />
