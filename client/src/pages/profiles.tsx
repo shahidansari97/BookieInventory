@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/tables/data-table";
 import ProfileModal from "@/components/modals/profile-modal";
+import ProfileDetailsModal from "@/components/modals/profile-details-modal";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type Profile, type InsertProfile } from "@shared/schema";
@@ -24,7 +25,9 @@ import { formatCurrency } from "@/config/currency";
 
 export default function Profiles() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [detailsProfile, setDetailsProfile] = useState<Profile | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -159,6 +162,11 @@ export default function Profiles() {
   const handleEditProfile = (profile: Profile) => {
     setSelectedProfile(profile);
     setIsModalOpen(true);
+  };
+
+  const handleViewDetails = (profile: Profile) => {
+    setDetailsProfile(profile);
+    setIsDetailsModalOpen(true);
   };
 
 
@@ -301,6 +309,7 @@ export default function Profiles() {
             variant="ghost"
             size="icon"
             onClick={() => handleEditProfile(row)}
+            title="Edit Profile"
             data-testid={`edit-profile-${row.id}`}
           >
             <Edit className="w-4 h-4 text-primary" />
@@ -308,13 +317,9 @@ export default function Profiles() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              setTxProfileId(row.id);
-              setTxProfileName(row.name || "");
-              setTxPage(1);
-            }}
-            title="View Transactions"
-            data-testid={`view-transactions-${row.id}`}
+            onClick={() => handleViewDetails(row)}
+            title="View Details"
+            data-testid={`view-details-${row.id}`}
           >
             <Eye className="w-4 h-4 text-blue-600" />
           </Button>
@@ -322,6 +327,7 @@ export default function Profiles() {
             variant="ghost"
             size="icon"
             onClick={() => handleDeleteProfile(row.id)}
+            title="Delete Profile"
             data-testid={`delete-profile-${row.id}`}
           >
             <Trash2 className="w-4 h-4 text-destructive" />
@@ -624,6 +630,16 @@ export default function Profiles() {
         }}
         profile={selectedProfile}
         onSubmit={() => {}} // ProfileModal handles its own API calls
+      />
+
+      {/* Profile Details Modal */}
+      <ProfileDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setDetailsProfile(null);
+        }}
+        profile={detailsProfile}
       />
     </div>
   );

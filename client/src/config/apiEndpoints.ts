@@ -12,6 +12,7 @@ export const API = {
   PROFILE_UPDATE: '/api/v1/profile/update',
   PROFILE_BY_TRANSACTION_TYPE: '/api/v1/profile/get-profile-transaction-type',
   UPLINK_PROFILES_ALL: '/api/v1/profile/get-all-uplink',
+  PARTNER_PROFILES_ALL: '/api/v1/profile/get-all-partner',
   TRANSACTION_CREATE: '/api/v1/transaction/create',
   TRANSACTION_INDEX: '/api/v1/transaction/index',
   DASHBOARD_INDEX: '/api/v1/dashboard/index',

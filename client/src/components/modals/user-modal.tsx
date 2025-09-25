@@ -53,6 +53,8 @@ const createValidationSchema = Yup.object({
   phone: Yup.string()
     .required("Phone number is required")
     .matches(/^[0-9]{10,15}$/, "Phone number must be 10-15 digits"),
+  status: Yup.boolean()
+    .required("Status is required"),
 });
 
 const updateValidationSchema = Yup.object({
@@ -101,31 +103,38 @@ export default function UserModal({
         
         let payload = { ...values };
         
-        // For updates, remove password if empty
-        if (isEditing && (!payload.password || payload.password === "")) {
-          const { password, ...dataWithoutPassword } = payload;
-          payload = dataWithoutPassword as UserFormData;
-        }
-        
-        let response;
         if (isEditing) {
+          // For updates, remove password if empty
+          if (!payload.password || payload.password === "") {
+            const { password, ...dataWithoutPassword } = payload;
+            payload = dataWithoutPassword as UserFormData;
+          }
           // Update user
-          response = await axios.post(API.USER_UPDATE, payload);
+          const response = await axios.post(API.USER_UPDATE, payload);
           console.log('User update response:', response.data);
+          
+          if (response.data.success) {
+            success(response.data.message || 'User updated successfully!');
+            onClose();
+            formik.resetForm();
+          } else {
+            // Backend returns success=false with 200; surface its message using API-style error
+            handleApi({ response: { status: 422, data: { message: response.data.message } } });
+          }
         } else {
-          // Create user
-          response = await axios.post(API.USER_REGISTER, payload);
+          // For create, remove id field
+          const { id, ...createPayload } = payload;
+          const response = await axios.post(API.USER_REGISTER, createPayload);
           console.log('User registration response:', response.data);
-        }
-        
-        if (response.data.success) {
-          const action = isEditing ? 'updated' : 'created';
-          success(response.data.message || `User ${action} successfully!`);
-          onClose();
-          formik.resetForm();
-        } else {
-          // Backend returns success=false with 200; surface its message using API-style error
-          handleApi({ response: { status: 422, data: { message: response.data.message } } });
+          
+          if (response.data.success) {
+            success(response.data.message || 'User created successfully!');
+            onClose();
+            formik.resetForm();
+          } else {
+            // Backend returns success=false with 200; surface its message using API-style error
+            handleApi({ response: { status: 422, data: { message: response.data.message } } });
+          }
         }
       } catch (error: any) {
         console.error('User operation error:', error);
@@ -147,10 +156,18 @@ export default function UserModal({
           password: "",
           country_code: user.country_code || "+91",
           phone: user.phone || "",
-          status: user.status || false,
+          status: user.status !== undefined ? user.status : true,
         });
       } else {
-        formik.resetForm();
+        formik.setValues({
+          id: "",
+          name: "",
+          email: "",
+          password: "",
+          country_code: "+91",
+          phone: "",
+          status: true,
+        });
       }
     }
   }, [isOpen, user]);
@@ -262,31 +279,32 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* Phone - spans both columns */}
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              Phone Number <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Enter phone number (10-15 digits)"
-              value={formik.values.phone}
-              onChange={handlePhoneChange}
-              onBlur={formik.handleBlur}
-              className={formik.touched.phone && formik.errors.phone ? "border-red-500" : ""}
-              data-testid="user-phone-input"
-            />
-            {formik.touched.phone && formik.errors.phone && (
-              <p className="text-sm text-red-500">{formik.errors.phone}</p>
-            )}
-          </div>
+          {/* Phone and Status - single row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Phone Number */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">
+                Phone Number <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter phone number (10-15 digits)"
+                value={formik.values.phone}
+                onChange={handlePhoneChange}
+                onBlur={formik.handleBlur}
+                className={formik.touched.phone && formik.errors.phone ? "border-red-500" : ""}
+                data-testid="user-phone-input"
+              />
+              {formik.touched.phone && formik.errors.phone && (
+                <p className="text-sm text-red-500">{formik.errors.phone}</p>
+              )}
+            </div>
 
-          {/* Status - only show for editing */}
-          {isEditing && (
+            {/* Status */}
             <div className="space-y-2">
               <Label htmlFor="status">
                 Status <span className="text-destructive">*</span>
@@ -307,7 +325,8 @@ export default function UserModal({
                 <p className="text-sm text-red-500">{formik.errors.status}</p>
               )}
             </div>
-          )}
+          </div>
+
 
           {/* Action buttons - span both columns */}
           <div className="flex space-x-3 pt-4">

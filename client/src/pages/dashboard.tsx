@@ -68,7 +68,7 @@ export default function Dashboard() {
   // Safe array normalization
   const uplinkProfilesArray: any[] = Array.isArray(uplinkProfiles) ? uplinkProfiles : [];
 
-  // Select first uplink profile by default when list loads
+  // Select first uplink profile by default when list loads (only if profiles are available)
   useEffect(() => {
     try {
       if (!selectedProfileId && uplinkProfilesArray.length > 0) {
@@ -77,6 +77,10 @@ export default function Dashboard() {
           console.log('Setting default profile:', firstProfile.id);
           setSelectedProfileId(firstProfile.id);
         }
+      } else if (uplinkProfilesArray.length === 0 && selectedProfileId) {
+        // Clear selection if no profiles are available
+        console.log('No uplink profiles available, clearing selection');
+        setSelectedProfileId(null);
       }
     } catch (error) {
       console.error('Error setting default profile:', error);
@@ -85,7 +89,8 @@ export default function Dashboard() {
 
   // Safe profile selection
   const selectedProfile = uplinkProfilesArray.find(p => p && p.id === selectedProfileId);
-  const selectedProfileName = selectedProfile?.name || (uplinkProfilesArray.length === 0 ? "Loading..." : "No Profile Selected");
+  const selectedProfileName = selectedProfile?.name || 
+    (uplinkProfilesArray.length === 0 ? "No Uplink Profiles" : "Select Profile");
   
   // Safe effective profile ID
   const effectiveSelectedProfileId = selectedProfileId || (uplinkProfilesArray.length > 0 ? uplinkProfilesArray[0]?.id : null);
@@ -120,6 +125,21 @@ export default function Dashboard() {
   // Safe stats calculation
   const stats = useMemo(() => {
     try {
+      // If no profile is selected, show empty state
+      if (!effectiveSelectedProfileId) {
+        return {
+          totalTransactions: 0,
+          totalAmount: 0,
+          uplinksCount: 0,
+          downlinesCount: 0,
+          recentTransactions: [],
+          outstandingBalance: 0,
+          totalTakenAmount: 0,
+          totalGivenAmount: 0,
+        };
+      }
+
+      // If profile is selected and we have dashboard data, use it
       if (profileDashboard && typeof profileDashboard === 'object') {
         const latest = Array.isArray(profileDashboard.latestTransactions) ? profileDashboard.latestTransactions : [];
         
@@ -135,26 +155,13 @@ export default function Dashboard() {
         };
       }
 
-      const uplinksCount = Array.isArray(profiles) ? profiles.filter(p => p?.type === "uplink").length : 0;
-      const downlinesCount = Array.isArray(profiles) ? profiles.filter(p => p?.type === "downline").length : 0;
-      const totalTransactions = Array.isArray(transactions) ? transactions.length : 0;
-      const totalAmount = Array.isArray(transactions) ? transactions.reduce((sum, t) => sum + (Number(t?.totalAmount) || 0), 0) : 0;
-      
-      const sortedTransactions = Array.isArray(transactions) ? [...transactions].sort((a, b) => {
-        try {
-          return new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime();
-        } catch {
-          return 0;
-        }
-      }) : [];
-      const recentTransactions = sortedTransactions.slice(0, 3);
-
+      // If profile is selected but no dashboard data yet, show empty state
       return {
-        totalTransactions,
-        totalAmount,
-        uplinksCount,
-        downlinesCount,
-        recentTransactions,
+        totalTransactions: 0,
+        totalAmount: 0,
+        uplinksCount: 0,
+        downlinesCount: 0,
+        recentTransactions: [],
         outstandingBalance: 0,
         totalTakenAmount: 0,
         totalGivenAmount: 0,
@@ -172,7 +179,7 @@ export default function Dashboard() {
         totalGivenAmount: 0,
       };
     }
-  }, [transactions, profiles, profileDashboard]);
+  }, [effectiveSelectedProfileId, profileDashboard]);
 
   // Safe date formatting
   const formatDate = (dateString: string) => {
@@ -333,6 +340,37 @@ export default function Dashboard() {
           <Button onClick={() => window.location.reload()}>
             Refresh Page
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no uplink profiles are available
+  if (uplinkProfilesArray.length === 0 && !profilesLoading) {
+    return (
+      <div className="p-4 md:p-6" data-testid="dashboard-page">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold mb-2" data-testid="dashboard-title">
+              Dashboard
+            </h2>
+            <p className="text-muted-foreground" data-testid="dashboard-description">
+              Overview of your inventory management system
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Selected Profile:</span>
+            <Button className="bg-gray-400 text-white cursor-not-allowed" disabled>
+              No Uplink Profiles
+            </Button>
+          </div>
+        </div>
+        
+        <div className="text-center py-12">
+          <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Uplink Profiles Available</h3>
+          <p className="text-muted-foreground mb-4">
+            You need to have uplink profiles to view dashboard data. Please contact your administrator to set up uplink profiles.
+          </p>
         </div>
       </div>
     );

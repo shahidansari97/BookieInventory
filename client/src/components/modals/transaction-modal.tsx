@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useQuery } from "@tanstack/react-query";
@@ -58,6 +59,11 @@ interface TransactionFormValues {
   notes: string;
   status: boolean;
   paymentStatus: boolean;
+  partners: Array<{
+    partnerProfileId: string;
+    partnerRatePerPoint: number;
+    partnerAmount: number;
+  }>;
 }
 
 // Validation schema - simplified for debugging
@@ -72,6 +78,13 @@ const transactionValidationSchema = Yup.object({
   notes: Yup.string().optional(),
   status: Yup.boolean().required("Status is required"),
   paymentStatus: Yup.boolean().required("Payment status is required"),
+  partners: Yup.array().of(
+    Yup.object({
+      partnerProfileId: Yup.string().required("Partner profile is required"),
+      partnerRatePerPoint: Yup.number().required("Partner rate is required").min(0, "Rate cannot be negative"),
+      partnerAmount: Yup.number().required("Partner amount is required").min(0, "Amount cannot be negative"),
+    })
+  ).optional(),
 });
 
 export default function TransactionModal({
@@ -122,6 +135,7 @@ export default function TransactionModal({
       notes: "",
       status: true,
       paymentStatus: true,
+      partners: [],
     },
     enableReinitialize: true,
     validationSchema: transactionValidationSchema,
@@ -157,6 +171,11 @@ export default function TransactionModal({
            date: values.date,
            status: values.status,
            paymentStatus: values.paymentStatus,
+          partners: values.partners?.map(p => ({
+            partnerProfileId: p.partnerProfileId,
+            partnerRatePerPoint: p.partnerRatePerPoint,
+            partnerAmount: p.partnerAmount,
+          })) || [],
          };
 
          console.log('Transaction API Payload:', JSON.stringify(payload, null, 2));
@@ -184,6 +203,25 @@ export default function TransactionModal({
      },
   });
 
+  // Recalculate partner amounts when amount or partner rates change
+  useEffect(() => {
+    const baseAmount = Number(formik.values.amount) || 0;
+    const current = formik.values.partners || [];
+    const recomputed = current.map((p: { partnerProfileId: string; partnerRatePerPoint: number; partnerAmount: number; }) => {
+      const partnerRate = Number(p.partnerRatePerPoint) || 0;
+      const computedAmount = baseAmount * partnerRate;
+      return {
+        ...p,
+        partnerAmount: Number.isFinite(computedAmount) ? computedAmount : 0,
+      };
+    });
+    // Only update if something actually changed to avoid loops
+    const changed = JSON.stringify(recomputed) !== JSON.stringify(current);
+    if (changed) {
+      formik.setFieldValue('partners', recomputed, false);
+    }
+  }, [formik.values.amount, formik.values.partners.map((p: { partnerRatePerPoint: number }) => p.partnerRatePerPoint).join(',')]);
+
   // Fetch transaction types
   const { data: transactionTypes = [], isLoading: isLoadingTypes } = useQuery<TransactionType[]>({
     queryKey: ['transaction-types'],
@@ -207,6 +245,16 @@ export default function TransactionModal({
       return response.data.data || [];
     },
     enabled: isOpen && transactionTypes.length > 0,
+  });
+
+  // Fetch Partner profiles (for partners array)
+  const { data: partnerProfiles = [], isLoading: isLoadingPartnerProfiles } = useQuery<Profile[]>({
+    queryKey: ['partner-profiles'],
+    queryFn: async () => {
+      const response = await axios.get(API.PARTNER_PROFILES_ALL);
+      return response.data.data || [];
+    },
+    enabled: isOpen,
   });
 
   // Fetch DOWNLINE profiles (only needed for DOWNLINE transactions)
@@ -501,6 +549,81 @@ export default function TransactionModal({
               {formik.touched.paymentStatus && formik.errors.paymentStatus && (
                 <p className="text-sm text-destructive">{formik.errors.paymentStatus}</p>
               )}
+            </div>
+
+            {/* Partners Section */}
+            <div className="md:col-span-2 space-y-3">
+              <Label className="text-sm font-semibold">Partners</Label>
+              <div className="space-y-2">
+                {formik.values.partners.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No partners added.</div>
+                )}
+                {formik.values.partners.map((partner: { partnerProfileId: string; partnerRatePerPoint: number; partnerAmount: number; }, index: number) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                    <div className="md:col-span-5">
+                      <Label>Partner Profile</Label>
+                      <Select
+                        onValueChange={(value) => formik.setFieldValue(`partners[${index}].partnerProfileId`, value)}
+                        value={partner.partnerProfileId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select partner profile" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(partnerProfiles as Profile[]).map((p: Profile) => (
+                            <SelectItem key={`partner-${p.id}`} value={p.id}>
+                              {p.name} ({p.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-3">
+                      <Label>Partner Rate/Point</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={partner.partnerRatePerPoint || 0}
+                        onChange={(e) => formik.setFieldValue(`partners[${index}].partnerRatePerPoint`, e.target.value ? parseFloat(e.target.value) : 0)}
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <Label>Partner Amount</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={partner.partnerAmount || 0}
+                        readOnly
+                      />
+                    </div>
+                    <div className="md:col-span-1 flex">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          const next = [...formik.values.partners];
+                          next.splice(index, 1);
+                          formik.setFieldValue('partners', next);
+                        }}
+                        className="text-destructive"
+                        title="Remove partner"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => formik.setFieldValue('partners', [...formik.values.partners, { partnerProfileId: '', partnerRatePerPoint: 0, partnerAmount: 0 }])}
+                className="mt-2"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Partner
+              </Button>
             </div>
 
             {/* Total Amount Display */}

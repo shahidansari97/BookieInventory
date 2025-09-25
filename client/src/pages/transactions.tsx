@@ -172,7 +172,7 @@ export default function Transactions() {
   const handleTransactionTypeFilterChange = (value: string) => {
     setTransactionTypeFilter(value);
     setCurrentPage(1);
-  };
+  }; 
 
   const handleProfileFilterChange = (value: string) => {
     setProfileFilter(value);
